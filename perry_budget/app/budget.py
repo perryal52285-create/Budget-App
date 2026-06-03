@@ -449,6 +449,49 @@ def sensor_payload(year, month):
     }
 
 
+DONUT_PALETTE = ["#5b9bff", "#ff5b5b", "#e3b341", "#b07cff", "#ff79b0",
+                 "#28b487", "#ff944d", "#46d970"]
+
+
+def month_allocation(view):
+    """Where this month's income goes: assigned bills grouped by category,
+    plus a 'Left / Spending' slice for what remains."""
+    cats = {}
+    for p in view["paychecks"]:
+        for b in p["bills"]:
+            c = (b.get("category") or "").strip() or "Other"
+            cats[c] = cats.get(c, 0) + b["amount_cents"]
+    segs = [{"label": c, "value": v} for c, v in sorted(cats.items(), key=lambda kv: -kv[1])]
+    if view["remaining"] > 0:
+        segs.append({"label": "Left / Spending", "value": view["remaining"], "rest": True})
+    return segs
+
+
+def donut_chart(segments, size=220, thickness=30, pad=6):
+    """Server-rendered SVG donut. Each segment -> a circle slice via
+    stroke-dasharray, so it themes cleanly and needs no JS/chart lib."""
+    import math
+    vals = [s for s in segments if s["value"] > 0]
+    total = sum(s["value"] for s in vals)
+    r = size / 2 - thickness / 2 - pad
+    circ = 2 * math.pi * r
+    out = []
+    acc = 0.0
+    for i, s in enumerate(vals):
+        frac = s["value"] / total if total else 0
+        color = "#2c9a52" if s.get("rest") else DONUT_PALETTE[i % len(DONUT_PALETTE)]
+        out.append({
+            "label": s["label"], "value": s["value"], "color": color,
+            "pct": round(frac * 100),
+            "dash": frac * circ, "gap": circ - frac * circ,
+            "offset": -acc * circ,
+        })
+        acc += frac
+    return {"segments": out, "total": total, "n": len(vals),
+            "size": size, "r": r, "cx": size / 2, "cy": size / 2,
+            "thickness": thickness, "circ": circ}
+
+
 def svg_area_chart(points, width=900, height=240, pad=4):
     if not points or len(points) < 2:
         return {"line": "", "area": "", "width": width, "height": height,

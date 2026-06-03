@@ -8,7 +8,10 @@
 </section>
 
 <section class="panel">
-  <div class="panel-head" data-emoji="🎯">&gt;&gt; CATEGORY BUDGETS</div>
+  <div class="sec-head">
+    <div class="panel-head" data-emoji="🎯">&gt;&gt; CATEGORY BUDGETS</div>
+    <button class="btn" type="button" data-modal-open="m-budget-add">+ Set budget</button>
+  </div>
   <p class="hint">Spent = recurring bills in that category + ad-hoc spending logged below. Bars turn red when you go over.</p>
   {% for r in rows %}
   <div class="budrow {{ 'is-over' if r.over }}">
@@ -33,27 +36,15 @@
   <div class="hint" style="margin-top:14px">Spending with no cap set:
     {% for u in untracked %}<code>{{ u.category }} {{ fmt(u.spent_cents) }}</code> {% endfor %}</div>
   {% endif %}
-
-  <form class="form row addrow" method="post" action="{{ base }}/manage/budgets/save">
-    <label>Category <input name="category" required placeholder="e.g. Groceries" list="cats"></label>
-    <datalist id="cats">{% for c in categories %}<option value="{{ c.category }}">{% endfor %}</datalist>
-    <label>Monthly cap <input name="amount" value="0.00"></label>
-    <button class="btn" type="submit">+ Set budget</button>
-  </form>
+  <datalist id="cats">{% for c in categories %}<option value="{{ c.category }}">{% endfor %}</datalist>
 </section>
 
 <section class="panel">
-  <div class="panel-head" data-emoji="🧾">&gt;&gt; LOG SPENDING — {{ label }}</div>
+  <div class="sec-head">
+    <div class="panel-head" data-emoji="🧾">&gt;&gt; SPENDING LOG — {{ label }}</div>
+    <button class="btn" type="button" data-modal-open="m-spend-add">+ Log spending</button>
+  </div>
   <p class="hint">Record one-off spending (anything beyond your recurring bills) so budgets reflect reality.</p>
-  <form class="form row" method="post" action="{{ base }}/budgets/spend">
-    <input type="hidden" name="year" value="{{ year }}">
-    <input type="hidden" name="month" value="{{ month }}">
-    <label>Category <input name="category" required list="cats"></label>
-    <label>Amount <input name="amount" value="0.00"></label>
-    <label>Note <input name="description" placeholder="optional"></label>
-    <label>Date <input name="txn_date" placeholder="YYYY-MM-DD"></label>
-    <button class="btn" type="submit">+ Log</button>
-  </form>
 
   <table class="tbl">
     <thead><tr><th>DATE</th><th>CATEGORY</th><th>NOTE</th><th class="r">AMOUNT</th><th></th></tr></thead>
@@ -72,5 +63,34 @@
     </tbody>
   </table>
 </section>
+
+<!-- ===================== MODALS ===================== -->
+<div class="modal" id="m-budget-add" hidden>
+  <div class="modal-card">
+    <div class="modal-head"><span data-emoji="🎯">Set category budget</span><button class="modal-x" type="button" data-modal-close>✕</button></div>
+    <form class="form" method="post" action="{{ base }}/manage/budgets/save">
+      <label>Category <input name="category" required placeholder="e.g. Groceries" list="cats"></label>
+      <label>Monthly cap <input name="amount" value="0.00"></label>
+      <div class="modal-foot"><button class="btn" type="submit">+ Set budget</button></div>
+    </form>
+  </div>
+</div>
+
+<div class="modal" id="m-spend-add" hidden>
+  <div class="modal-card">
+    <div class="modal-head"><span data-emoji="🧾">Log spending · {{ label }}</span><button class="modal-x" type="button" data-modal-close>✕</button></div>
+    <form class="form" method="post" action="{{ base }}/budgets/spend">
+      <input type="hidden" name="year" value="{{ year }}">
+      <input type="hidden" name="month" value="{{ month }}">
+      <div class="src-grid">
+        <label>Category <input name="category" required list="cats"></label>
+        <label>Amount <input name="amount" value="0.00"></label>
+        <label>Note <input name="description" placeholder="optional"></label>
+        <label>Date <input name="txn_date" placeholder="YYYY-MM-DD"></label>
+      </div>
+      <div class="modal-foot"><button class="btn" type="submit">+ Log spending</button></div>
+    </form>
+  </div>
+</div>
 
 {% endblock %}

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.1
+- **Fix:** adding a bill failed with "Internal Server Error" on databases that
+  carried over from an earlier install — the `bills` table was missing the
+  columns added in Phase 2. Added migrations so old databases self-upgrade
+  (existing rows are preserved).
+- **Allocation donut** — a themed donut chart on the dashboard shows where each
+  month's income goes (bills by category + what's left).
+- **Pop-out dialogs** — adding/editing income, bills, debts, earners, budgets,
+  and spending now happens in clean modal pop-outs instead of long inline forms.
+- **Tidier Manage page** — income/bills/debts shown as compact tables with
+  edit/delete actions; the page no longer stacks every field down the screen.
+
 ## 0.3.0
 - **Category budgets** — set a monthly cap per category; spend = recurring bills +
   ad-hoc logged spending, shown as progress bars that flag when you go over.

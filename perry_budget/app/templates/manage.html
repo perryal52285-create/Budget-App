@@ -1,123 +1,70 @@
 {% extends "base.html" %}
 {% block content %}
 
-<p class="page-intro">Edit every input here. Changes save instantly and flow into each month's view.</p>
+<p class="page-intro">Your recurring setup lives here. Add things with the <b>+ buttons</b> (they pop out) so the
+page stays tidy; changes save instantly and flow into every month's view.</p>
 
 <!-- EARNERS -->
 <section class="panel" id="earners">
-  <div class="panel-head" data-emoji="👥">&gt;&gt; EARNERS</div>
-  <div class="grid-2">
+  <div class="sec-head">
+    <div class="panel-head" data-emoji="👥">&gt;&gt; EARNERS</div>
+    <button class="btn" type="button" data-modal-open="m-earner-add">+ Add earner</button>
+  </div>
+  <div class="chip-grid">
     {% for e in earners %}
-    <form class="form row" method="post" action="{{ base }}/manage/earners/{{ e.id }}/update">
-      <label>Name <input name="name" value="{{ e.name }}"></label>
-      <label>Color <input type="color" name="color" value="{{ e.color }}"></label>
-      <button class="btn" type="submit">Save</button>
+    <form class="chip" method="post" action="{{ base }}/manage/earners/{{ e.id }}/update">
+      <span class="chip-dot" style="background: {{ e.color }}"></span>
+      <input name="name" value="{{ e.name }}" class="chip-name">
+      <input type="color" name="color" value="{{ e.color }}">
+      <button class="btn-sm" type="submit">save</button>
       {% if not e.is_primary %}
       <button class="btn-x" type="submit" formaction="{{ base }}/manage/earners/{{ e.id }}/delete">✕</button>
       {% endif %}
     </form>
     {% endfor %}
   </div>
-  <form class="form row" method="post" action="{{ base }}/manage/earners/add">
-    <label>Add earner <input name="name" required placeholder="name"></label>
-    <label>Color <input type="color" name="color" value="#7c5cff"></label>
-    <button class="btn" type="submit">+ Add</button>
-  </form>
 </section>
 
 <!-- INCOME -->
 <section class="panel" id="income">
-  <div class="panel-head" data-emoji="💵">&gt;&gt; INCOME / PAYCHECKS (running schedule)</div>
-  <p class="hint">Biweekly uses the <b>anchor date</b> (next/any payday) and repeats every 14 days — that's
-    what creates the 3-paycheck months. <b>Motus</b> is a reimbursement that rides your payroll checks.</p>
-
-  {% for s in sources %}
-  <form class="form src" method="post" action="{{ base }}/manage/income/{{ s.id }}/update">
-    <div class="src-grid">
-      <label>Name <input name="name" value="{{ s.name }}"></label>
-      <label>Employer <input name="employer" value="{{ s.employer or '' }}"></label>
-      <label>Earner
-        <select name="earner_id">
-          {% for e in earners %}<option value="{{ e.id }}" {{ 'selected' if e.id == s.earner_id }}>{{ e.name }}</option>{% endfor %}
-        </select>
-      </label>
-      <label>Kind
-        <select name="kind">
-          {% for k in kinds %}<option value="{{ k }}" {{ 'selected' if k == s.kind }}>{{ k }}</option>{% endfor %}
-        </select>
-      </label>
-      <label>Frequency
-        <select name="frequency">
-          {% for f in frequencies %}<option value="{{ f }}" {{ 'selected' if f == s.frequency }}>{{ f }}</option>{% endfor %}
-        </select>
-      </label>
-      <label>Amount <input name="amount" value="{{ '%.2f'|format(s.amount_cents/100) }}"></label>
-      <label>Anchor date <input name="anchor_date" value="{{ s.anchor_date }}" placeholder="YYYY-MM-DD"></label>
-      <label>Day 1 <input name="day1" value="{{ s.day1 }}" size="3"></label>
-      <label>Day 2 <input name="day2" value="{{ s.day2 }}" size="3"></label>
-      <label>Month <input name="month" value="{{ s.month }}" size="3"></label>
-    </div>
-    <div class="src-foot">
-      <span class="preview">next: {% for d in s.preview %}<code>{{ d.strftime('%b %-d') }}</code>{% else %}<span class="muted">—</span>{% endfor %}</span>
-      <span class="spacer"></span>
-      <button class="btn" type="submit">Save</button>
-      <button class="btn-x" type="submit" formaction="{{ base }}/manage/income/{{ s.id }}/delete">✕</button>
-    </div>
-  </form>
-  {% endfor %}
-
-  <form class="form row addrow" method="post" action="{{ base }}/manage/income/add">
-    <label>New source <input name="name" required placeholder="e.g. Rae Payroll"></label>
-    <label>Employer <input name="employer" placeholder="employer"></label>
-    <label>Earner
-      <select name="earner_id">{% for e in earners %}<option value="{{ e.id }}">{{ e.name }}</option>{% endfor %}</select>
-    </label>
-    <label>Kind
-      <select name="kind">{% for k in kinds %}<option value="{{ k }}">{{ k }}</option>{% endfor %}</select>
-    </label>
-    <label>Frequency
-      <select name="frequency">{% for f in frequencies %}<option value="{{ f }}" {{ 'selected' if f == 'biweekly' }}>{{ f }}</option>{% endfor %}</select>
-    </label>
-    <label>Amount <input name="amount" value="0.00"></label>
-    <label>Anchor <input name="anchor_date" placeholder="YYYY-MM-DD"></label>
-    <button class="btn" type="submit">+ Add</button>
-  </form>
+  <div class="sec-head">
+    <div class="panel-head" data-emoji="💵">&gt;&gt; INCOME / PAYCHECKS</div>
+    <button class="btn" type="button" data-modal-open="m-income-add">+ Add income</button>
+  </div>
+  <p class="hint">Biweekly repeats every 14 days from the <b>anchor date</b> — that's what creates the
+    3-paycheck months. <b>Motus</b> is a reimbursement that rides your payroll checks.</p>
+  <table class="tbl">
+    <thead><tr><th>NAME</th><th>EMPLOYER</th><th>WHO</th><th>FREQUENCY</th><th class="r">AMOUNT</th><th>NEXT</th><th></th></tr></thead>
+    <tbody>
+      {% for s in sources %}
+      <tr>
+        <td>{{ s.name }}</td>
+        <td class="muted">{{ s.employer or '—' }}</td>
+        <td class="muted">{{ (earners | selectattr('id','equalto', s.earner_id) | map(attribute='name') | first) or '?' }}</td>
+        <td class="muted">{{ s.frequency }}</td>
+        <td class="r">{{ fmt(s.amount_cents) }}</td>
+        <td class="muted">{% for d in s.preview[:2] %}<code>{{ d.strftime('%b %-d') }}</code>{% else %}—{% endfor %}</td>
+        <td class="r nowrap">
+          <button class="btn-sm" type="button" data-modal-open="m-src-{{ s.id }}">edit</button>
+          <form method="post" action="{{ base }}/manage/income/{{ s.id }}/delete" class="inline"
+                onsubmit="return confirm('Delete {{ s.name }}?')"><button class="btn-x" type="submit">✕</button></form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" class="muted">no income yet — add one above</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
 </section>
 
 <!-- BILLS -->
 <section class="panel" id="bills">
-  <div class="panel-head" data-emoji="🧾">&gt;&gt; BILLS</div>
+  <div class="sec-head">
+    <div class="panel-head" data-emoji="🧾">&gt;&gt; BILLS</div>
+    <button class="btn" type="button" data-modal-open="m-bill-add">+ Add bill</button>
+  </div>
   <p class="hint">Auto funding assigns each bill to the paycheck just before its due day (never the extra
     3rd check). Switch to manual to pin it to a specific check.</p>
-  <form class="form row" method="post" action="{{ base }}/manage/bills/add">
-    <label>Name <input name="name" required></label>
-    <label>Amount <input name="amount" value="0.00"></label>
-    <label>Due day <input name="due_dom" value="1" size="3"></label>
-    <label>Category <input name="category"></label>
-    <label>Where <input name="where_to_pay"></label>
-    <label>Responsible
-      <select name="responsible_earner_id">
-        <option value="">joint</option>
-        {% for e in earners %}<option value="{{ e.id }}">{{ e.name }}</option>{% endfor %}
-      </select>
-    </label>
-    <label>Funding
-      <select name="funding_mode">
-        <option value="auto">auto</option>
-        <option value="manual">manual</option>
-      </select>
-    </label>
-    <label>Manual source
-      <select name="funding_source_id">
-        <option value="">—</option>
-        {% for s in sources %}{% if s.kind != 'reimbursement' %}<option value="{{ s.id }}">{{ s.name }}</option>{% endif %}{% endfor %}
-      </select>
-    </label>
-    <label>Check # <input name="funding_occurrence" placeholder="1" size="3"></label>
-    <label class="chk">Autopay <input type="checkbox" name="autopay" value="1"></label>
-    <button class="btn" type="submit">+ Add bill</button>
-  </form>
-
   <table class="tbl">
     <thead><tr><th>BILL</th><th>DUE</th><th>WHO</th><th>FUNDING</th><th class="r">AMOUNT</th><th></th></tr></thead>
     <tbody>
@@ -128,7 +75,7 @@
         <td class="muted">{{ (earners | selectattr('id','equalto', b.responsible_earner_id) | map(attribute='name') | first) or 'joint' }}</td>
         <td class="muted">{{ b.funding_mode }}{% if b.funding_mode == 'manual' and b.funding_occurrence %} #{{ b.funding_occurrence }}{% endif %}</td>
         <td class="r">{{ fmt(b.amount_cents) }}</td>
-        <td class="r"><form method="post" action="{{ base }}/manage/bills/{{ b.id }}/delete"
+        <td class="r"><form method="post" action="{{ base }}/manage/bills/{{ b.id }}/delete" class="inline"
               onsubmit="return confirm('Delete {{ b.name }}?')"><button class="btn-x" type="submit">✕</button></form></td>
       </tr>
       {% else %}
@@ -140,16 +87,11 @@
 
 <!-- DEBTS -->
 <section class="panel" id="debts">
-  <div class="panel-head" data-emoji="⛄">&gt;&gt; DEBTS (SNOWBALL)</div>
+  <div class="sec-head">
+    <div class="panel-head" data-emoji="⛄">&gt;&gt; DEBTS (SNOWBALL)</div>
+    <button class="btn" type="button" data-modal-open="m-debt-add">+ Add debt</button>
+  </div>
   <p class="hint">Roll order sets snowball priority (1 = pay off first). Lowest balance wins ties.</p>
-  <form class="form row" method="post" action="{{ base }}/manage/debts/add">
-    <label>Name <input name="name" required></label>
-    <label>Balance <input name="balance" value="0.00"></label>
-    <label>Min payment <input name="min_payment" value="0.00"></label>
-    <label>APR % <input name="apr" value="0"></label>
-    <label>Roll order <input name="roll_order" value="0" size="3"></label>
-    <button class="btn" type="submit">+ Add debt</button>
-  </form>
   <table class="tbl">
     <thead><tr><th>#</th><th>DEBT</th><th class="r">BALANCE</th><th class="r">MIN</th><th class="r">APR</th><th></th></tr></thead>
     <tbody>
@@ -158,7 +100,7 @@
         <td class="muted">{{ d.roll_order }}</td><td>{{ d.name }}</td>
         <td class="r">{{ fmt(d.balance_cents) }}</td><td class="r">{{ fmt(d.min_payment_cents) }}</td>
         <td class="r muted">{{ '%.1f'|format(d.apr) }}%</td>
-        <td class="r"><form method="post" action="{{ base }}/manage/debts/{{ d.id }}/delete"
+        <td class="r"><form method="post" action="{{ base }}/manage/debts/{{ d.id }}/delete" class="inline"
               onsubmit="return confirm('Delete {{ d.name }}?')"><button class="btn-x" type="submit">✕</button></form></td>
       </tr>
       {% else %}
@@ -179,22 +121,119 @@
       <label class="chk">Export HA sensors <input type="checkbox" name="sensors_enabled" value="1" {{ 'checked' if sensors_enabled }}></label>
     </div>
     <div class="src-foot">
-      <span class="hint">
-        Timezone sets the current month &amp; clock (e.g. America/Chicago = CT).
-        <b>Notify service</b> is the HA service used for alerts (e.g. <code>notify</code>,
-        <code>mobile_app_alex_phone</code>). Sensors publish to <code>sensor.perry_budget_*</code>.
-      </span>
+      <span class="hint">Timezone sets the current month &amp; clock (CT = America/Chicago).
+        <b>Notify service</b> is the HA service for alerts (e.g. <code>notify</code>,
+        <code>mobile_app_alex_phone</code>). Sensors publish to <code>sensor.perry_budget_*</code>.</span>
       <span class="spacer"></span>
       <button class="btn" type="submit">Save</button>
     </div>
   </form>
   <form class="form row" method="post" action="{{ base }}/alerts/test" style="margin-top:12px">
     <button class="btn" type="submit">Send test alert + push sensors</button>
-    <span class="hint">
-      {% if ha_available %}Home Assistant link detected ✓ — sends a test notification and refreshes sensors now.
-      {% else %}Home Assistant API not detected (you're likely running locally). This works once installed as an add-on.{% endif %}
-    </span>
+    <span class="hint">{% if ha_available %}Home Assistant link detected ✓ — sends a test notification and refreshes sensors now.
+      {% else %}Home Assistant API not detected (running locally). Works once installed as an add-on.{% endif %}</span>
   </form>
 </section>
+
+
+<!-- ===================== MODALS ===================== -->
+
+<!-- add earner -->
+<div class="modal" id="m-earner-add" hidden>
+  <div class="modal-card">
+    <div class="modal-head"><span data-emoji="👥">Add earner</span><button class="modal-x" type="button" data-modal-close>✕</button></div>
+    <form class="form" method="post" action="{{ base }}/manage/earners/add">
+      <label>Name <input name="name" required placeholder="name"></label>
+      <label>Color <input type="color" name="color" value="#7c5cff"></label>
+      <div class="modal-foot"><button class="btn" type="submit">+ Add earner</button></div>
+    </form>
+  </div>
+</div>
+
+<!-- add income -->
+<div class="modal" id="m-income-add" hidden>
+  <div class="modal-card">
+    <div class="modal-head"><span data-emoji="💵">Add income source</span><button class="modal-x" type="button" data-modal-close>✕</button></div>
+    <form class="form" method="post" action="{{ base }}/manage/income/add">
+      <div class="src-grid">
+        <label>Name <input name="name" required placeholder="e.g. Rae Payroll"></label>
+        <label>Employer <input name="employer" placeholder="employer"></label>
+        <label>Earner <select name="earner_id">{% for e in earners %}<option value="{{ e.id }}">{{ e.name }}</option>{% endfor %}</select></label>
+        <label>Kind <select name="kind">{% for k in kinds %}<option value="{{ k }}">{{ k }}</option>{% endfor %}</select></label>
+        <label>Frequency <select name="frequency">{% for f in frequencies %}<option value="{{ f }}" {{ 'selected' if f == 'biweekly' }}>{{ f }}</option>{% endfor %}</select></label>
+        <label>Amount <input name="amount" value="0.00"></label>
+        <label>Anchor date <input name="anchor_date" placeholder="YYYY-MM-DD"></label>
+        <label>Day 1 <input name="day1" value="1" size="3"></label>
+        <label>Day 2 <input name="day2" value="0" size="3"></label>
+        <label>Month <input name="month" value="1" size="3"></label>
+      </div>
+      <div class="modal-foot"><button class="btn" type="submit">+ Add income</button></div>
+    </form>
+  </div>
+</div>
+
+<!-- edit income (one per source) -->
+{% for s in sources %}
+<div class="modal" id="m-src-{{ s.id }}" hidden>
+  <div class="modal-card">
+    <div class="modal-head"><span data-emoji="💵">Edit · {{ s.name }}</span><button class="modal-x" type="button" data-modal-close>✕</button></div>
+    <form class="form" method="post" action="{{ base }}/manage/income/{{ s.id }}/update">
+      <div class="src-grid">
+        <label>Name <input name="name" value="{{ s.name }}"></label>
+        <label>Employer <input name="employer" value="{{ s.employer or '' }}"></label>
+        <label>Earner <select name="earner_id">{% for e in earners %}<option value="{{ e.id }}" {{ 'selected' if e.id == s.earner_id }}>{{ e.name }}</option>{% endfor %}</select></label>
+        <label>Kind <select name="kind">{% for k in kinds %}<option value="{{ k }}" {{ 'selected' if k == s.kind }}>{{ k }}</option>{% endfor %}</select></label>
+        <label>Frequency <select name="frequency">{% for f in frequencies %}<option value="{{ f }}" {{ 'selected' if f == s.frequency }}>{{ f }}</option>{% endfor %}</select></label>
+        <label>Amount <input name="amount" value="{{ '%.2f'|format(s.amount_cents/100) }}"></label>
+        <label>Anchor date <input name="anchor_date" value="{{ s.anchor_date }}" placeholder="YYYY-MM-DD"></label>
+        <label>Day 1 <input name="day1" value="{{ s.day1 }}" size="3"></label>
+        <label>Day 2 <input name="day2" value="{{ s.day2 }}" size="3"></label>
+        <label>Month <input name="month" value="{{ s.month }}" size="3"></label>
+      </div>
+      <div class="preview">next: {% for d in s.preview %}<code>{{ d.strftime('%b %-d') }}</code>{% else %}<span class="muted">—</span>{% endfor %}</div>
+      <div class="modal-foot"><button class="btn" type="submit">Save changes</button></div>
+    </form>
+  </div>
+</div>
+{% endfor %}
+
+<!-- add bill -->
+<div class="modal" id="m-bill-add" hidden>
+  <div class="modal-card">
+    <div class="modal-head"><span data-emoji="🧾">Add bill</span><button class="modal-x" type="button" data-modal-close>✕</button></div>
+    <form class="form" method="post" action="{{ base }}/manage/bills/add">
+      <div class="src-grid">
+        <label>Name <input name="name" required></label>
+        <label>Amount <input name="amount" value="0.00"></label>
+        <label>Due day <input name="due_dom" value="1" size="3"></label>
+        <label>Category <input name="category" placeholder="e.g. Utilities"></label>
+        <label>Where <input name="where_to_pay"></label>
+        <label>Responsible <select name="responsible_earner_id"><option value="">joint</option>{% for e in earners %}<option value="{{ e.id }}">{{ e.name }}</option>{% endfor %}</select></label>
+        <label>Funding <select name="funding_mode"><option value="auto">auto</option><option value="manual">manual</option></select></label>
+        <label>Manual source <select name="funding_source_id"><option value="">—</option>{% for s in sources %}{% if s.kind != 'reimbursement' %}<option value="{{ s.id }}">{{ s.name }}</option>{% endif %}{% endfor %}</select></label>
+        <label>Check # <input name="funding_occurrence" placeholder="1" size="3"></label>
+        <label class="chk">Autopay <input type="checkbox" name="autopay" value="1"></label>
+      </div>
+      <div class="modal-foot"><button class="btn" type="submit">+ Add bill</button></div>
+    </form>
+  </div>
+</div>
+
+<!-- add debt -->
+<div class="modal" id="m-debt-add" hidden>
+  <div class="modal-card">
+    <div class="modal-head"><span data-emoji="⛄">Add debt</span><button class="modal-x" type="button" data-modal-close>✕</button></div>
+    <form class="form" method="post" action="{{ base }}/manage/debts/add">
+      <div class="src-grid">
+        <label>Name <input name="name" required></label>
+        <label>Balance <input name="balance" value="0.00"></label>
+        <label>Min payment <input name="min_payment" value="0.00"></label>
+        <label>APR % <input name="apr" value="0"></label>
+        <label>Roll order <input name="roll_order" value="0" size="3"></label>
+      </div>
+      <div class="modal-foot"><button class="btn" type="submit">+ Add debt</button></div>
+    </form>
+  </div>
+</div>
 
 {% endblock %}

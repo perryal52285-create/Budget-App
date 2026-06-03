@@ -137,6 +137,15 @@ def init_db():
 # databases that persist across rebuilds pick them up.
 _MIGRATIONS = [
     ("income_sources", "employer", "TEXT DEFAULT ''"),
+    # bills columns added after Phase 1 (old DBs only had due_day/assignment)
+    ("bills", "due_dom", "INTEGER NOT NULL DEFAULT 1"),
+    ("bills", "category", "TEXT DEFAULT ''"),
+    ("bills", "autopay", "INTEGER NOT NULL DEFAULT 0"),
+    ("bills", "where_to_pay", "TEXT DEFAULT ''"),
+    ("bills", "responsible_earner_id", "INTEGER DEFAULT NULL"),
+    ("bills", "funding_mode", "TEXT NOT NULL DEFAULT 'auto'"),
+    ("bills", "funding_source_id", "INTEGER DEFAULT NULL"),
+    ("bills", "funding_occurrence", "INTEGER DEFAULT NULL"),
 ]
 
 

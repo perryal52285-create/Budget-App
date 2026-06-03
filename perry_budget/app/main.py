@@ -84,10 +84,12 @@ def dashboard(request: Request, year: int = None, month: int = None):
     ny, nm = budget.shift_month(year, month, 1)
     months_, points = budget.snowball_projection()
     chart = budget.svg_area_chart(points)
+    donut = budget.donut_chart(budget.month_allocation(view))
 
     return templates.TemplateResponse("dashboard.html", ctx(
         request,
         view=view,
+        donut=donut,
         prev={"year": py, "month": pm},
         next={"year": ny, "month": nm},
         is_current=(year, month) == (cy, cm),

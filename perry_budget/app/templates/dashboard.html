@@ -47,17 +47,48 @@
   </div>
 </section>
 
-<section class="panel chart-panel">
-  <div class="panel-head" data-emoji="📊">&gt;&gt; DEBT PAYOFF — PROJECTED</div>
-  {% if chart.n > 1 %}
-  <svg class="chart" viewBox="0 0 {{ chart.width }} {{ chart.height }}" preserveAspectRatio="none">
-    <path class="chart-area" d="{{ chart.area }}" />
-    <path class="chart-line" d="{{ chart.line }}" />
-  </svg>
-  <div class="chart-axis"><span>{{ fmt(chart.hi) }}</span><span>now → {{ payoff_months }} mo</span><span>{{ fmt(chart.lo) }}</span></div>
-  {% else %}
-  <div class="empty">No debts yet — add some in <a href="{{ base }}/manage#debts">MANAGE</a>.</div>
-  {% endif %}
+<section class="panel-row">
+  <div class="panel">
+    <div class="panel-head" data-emoji="🍩">&gt;&gt; WHERE THIS MONTH GOES</div>
+    {% if donut.n > 0 %}
+    <div class="donut-wrap">
+      <svg class="donut" viewBox="0 0 {{ donut.size }} {{ donut.size }}">
+        <circle class="donut-track" cx="{{ donut.cx }}" cy="{{ donut.cy }}" r="{{ donut.r }}"
+                fill="none" stroke-width="{{ donut.thickness }}" />
+        {% for s in donut.segments %}
+        <circle cx="{{ donut.cx }}" cy="{{ donut.cy }}" r="{{ donut.r }}" fill="none"
+                stroke="{{ s.color }}" stroke-width="{{ donut.thickness }}"
+                stroke-dasharray="{{ '%.2f'|format(s.dash) }} {{ '%.2f'|format(s.gap) }}"
+                stroke-dashoffset="{{ '%.2f'|format(s.offset) }}"
+                transform="rotate(-90 {{ donut.cx }} {{ donut.cy }})" />
+        {% endfor %}
+        <text class="donut-center" x="{{ donut.cx }}" y="{{ donut.cy - 4 }}" text-anchor="middle">{{ fmt(view.total_in) }}</text>
+        <text class="donut-sub" x="{{ donut.cx }}" y="{{ donut.cy + 16 }}" text-anchor="middle">income</text>
+      </svg>
+      <ul class="donut-legend">
+        {% for s in donut.segments %}
+        <li><span class="dot" style="background: {{ s.color }}"></span>
+          {{ s.label }} <span class="muted">{{ fmt(s.value) }} · {{ s.pct }}%</span></li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% else %}
+    <div class="empty">Add income & bills to see your allocation.</div>
+    {% endif %}
+  </div>
+
+  <div class="panel chart-panel">
+    <div class="panel-head" data-emoji="📊">&gt;&gt; DEBT PAYOFF — PROJECTED</div>
+    {% if chart.n > 1 %}
+    <svg class="chart" viewBox="0 0 {{ chart.width }} {{ chart.height }}" preserveAspectRatio="none">
+      <path class="chart-area" d="{{ chart.area }}" />
+      <path class="chart-line" d="{{ chart.line }}" />
+    </svg>
+    <div class="chart-axis"><span>{{ fmt(chart.hi) }}</span><span>now → {{ payoff_months }} mo</span><span>{{ fmt(chart.lo) }}</span></div>
+    {% else %}
+    <div class="empty">No debts yet — add some in <a href="{{ base }}/manage#debts">MANAGE</a>.</div>
+    {% endif %}
+  </div>
 </section>
 
 <section class="checks">
