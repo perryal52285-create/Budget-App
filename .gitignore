@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+perry_budget/data/
+*.db
+.DS_Store

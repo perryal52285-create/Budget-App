@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Perry Budget</title>
+  <link rel="stylesheet" href="{{ base }}/static/theme.css">
+  <script>
+    // apply saved theme before paint to avoid flash
+    (function () {
+      var t = localStorage.getItem("perry-theme") || "dark";
+      document.documentElement.setAttribute("data-theme", t);
+    })();
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">PERRY<span class="slash">//</span>BUDGET</div>
+    <nav class="nav">
+      <a href="{{ base }}/">[ DASHBOARD ]</a>
+      <a href="{{ base }}/manage">[ MANAGE ]</a>
+    </nav>
+    <button id="theme-toggle" class="toggle" type="button" title="Toggle theme">
+      <span class="dark-label">&gt;_ TERMINAL</span>
+      <span class="light-label">✨ Bubbly</span>
+    </button>
+  </header>
+
+  <main class="wrap">
+    {% block content %}{% endblock %}
+  </main>
+
+  <script src="{{ base }}/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block content %}
+
+<p class="page-intro">Edit every input here. Changes save to the budget instantly.</p>
+
+<!-- INCOME -->
+<section class="panel" id="income">
+  <div class="panel-head">&gt;&gt; INCOME / PAYCHECKS</div>
+  <p class="hint">Net is your take-home for that check. <b>Motus</b> is the variable vehicle reimbursement — enter the actual amount each cycle.</p>
+  <div class="grid-2">
+    {% for check in checks %}
+    {% set pc = (paychecks | selectattr('label', 'equalto', check) | list | first) %}
+    <form class="form" method="post" action="{{ base }}/manage/paychecks/save">
+      <div class="form-title">{{ check }} CHECK</div>
+      <input type="hidden" name="label" value="{{ check }}">
+      <label>Net take-home <input name="net" value="{{ '%.2f'|format((pc.net_cents/100) if pc else 0) }}"></label>
+      <label>Motus reimb. <input name="motus" value="{{ '%.2f'|format((pc.motus_cents/100) if pc else 0) }}"></label>
+      <label>Other income <input name="other" value="{{ '%.2f'|format((pc.other_cents/100) if pc else 0) }}"></label>
+      <button class="btn" type="submit">Save {{ check }}</button>
+    </form>
+    {% endfor %}
+  </div>
+</section>
+
+<!-- BILLS -->
+<section class="panel" id="bills">
+  <div class="panel-head">&gt;&gt; BILLS</div>
+  <form class="form row" method="post" action="{{ base }}/manage/bills/add">
+    <label>Name <input name="name" required></label>
+    <label>Amount <input name="amount" value="0.00"></label>
+    <label>Due <input name="due_day" placeholder="14th / 1st"></label>
+    <label>Category <input name="category"></label>
+    <label>Where to pay <input name="where_to_pay"></label>
+    <label>Check
+      <select name="assignment">
+        {% for c in checks %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="chk">Autopay <input type="checkbox" name="autopay" value="1"></label>
+    <button class="btn" type="submit">+ Add bill</button>
+  </form>
+
+  <table class="tbl">
+    <thead><tr><th>BILL</th><th>CHECK</th><th>DUE</th><th>WHERE</th><th class="r">AMOUNT</th><th></th></tr></thead>
+    <tbody>
+      {% for b in bills %}
+      <tr>
+        <td>{{ b.name }}{% if b.autopay %} <span class="tag">auto</span>{% endif %}</td>
+        <td>{{ b.assignment }}</td>
+        <td class="muted">{{ b.due_day }}</td>
+        <td class="muted">{{ b.where_to_pay }}</td>
+        <td class="r">{{ fmt(b.amount_cents) }}</td>
+        <td class="r">
+          <form method="post" action="{{ base }}/manage/bills/{{ b.id }}/delete"
+                onsubmit="return confirm('Delete {{ b.name }}?')">
+            <button class="btn-x" type="submit">✕</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="muted">no bills yet</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<!-- DEBTS -->
+<section class="panel" id="debts">
+  <div class="panel-head">&gt;&gt; DEBTS (SNOWBALL)</div>
+  <p class="hint">Roll order sets snowball priority (1 = pay off first). Lowest balance wins ties.</p>
+  <form class="form row" method="post" action="{{ base }}/manage/debts/add">
+    <label>Name <input name="name" required></label>
+    <label>Balance <input name="balance" value="0.00"></label>
+    <label>Min payment <input name="min_payment" value="0.00"></label>
+    <label>APR % <input name="apr" value="0"></label>
+    <label>Roll order <input name="roll_order" value="0"></label>
+    <button class="btn" type="submit">+ Add debt</button>
+  </form>
+
+  <table class="tbl">
+    <thead><tr><th>#</th><th>DEBT</th><th class="r">BALANCE</th><th class="r">MIN</th><th class="r">APR</th><th></th></tr></thead>
+    <tbody>
+      {% for d in debts %}
+      <tr>
+        <td class="muted">{{ d.roll_order }}</td>
+        <td>{{ d.name }}</td>
+        <td class="r">{{ fmt(d.balance_cents) }}</td>
+        <td class="r">{{ fmt(d.min_payment_cents) }}</td>
+        <td class="r muted">{{ '%.1f'|format(d.apr) }}%</td>
+        <td class="r">
+          <form method="post" action="{{ base }}/manage/debts/{{ d.id }}/delete"
+                onsubmit="return confirm('Delete {{ d.name }}?')">
+            <button class="btn-x" type="submit">✕</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="muted">no debts yet</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+{% endblock %}

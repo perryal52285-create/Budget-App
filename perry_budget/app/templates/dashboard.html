@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block content %}
+
+<section class="cards">
+  <div class="card">
+    <div class="card-label">AVAILABLE — 14TH</div>
+    <div class="card-value {{ 'neg' if env['14th'].remaining < 0 else 'pos' }}">
+      {{ fmt(env['14th'].remaining) }}
+    </div>
+    <div class="card-sub">of {{ fmt(env['14th'].available) }} in</div>
+  </div>
+  <div class="card">
+    <div class="card-label">AVAILABLE — 28TH</div>
+    <div class="card-value {{ 'neg' if env['28th'].remaining < 0 else 'pos' }}">
+      {{ fmt(env['28th'].remaining) }}
+    </div>
+    <div class="card-sub">of {{ fmt(env['28th'].available) }} in</div>
+  </div>
+  <div class="card">
+    <div class="card-label">REMAINING — MONTH</div>
+    <div class="card-value {{ 'neg' if env.monthly.remaining < 0 else 'pos' }}">
+      {{ fmt(env.monthly.remaining) }}
+    </div>
+    <div class="card-sub">{{ fmt(env.monthly.assigned) }} in bills</div>
+  </div>
+  <div class="card">
+    <div class="card-label">TOTAL DEBT</div>
+    <div class="card-value neg">{{ fmt(total_debt) }}</div>
+    <div class="card-sub">snowball target: {{ next_target or '—' }}</div>
+  </div>
+  <div class="card">
+    <div class="card-label">PROJECTED PAYOFF</div>
+    <div class="card-value accent">
+      {% if payoff_months %}{{ payoff_months }} mo{% else %}—{% endif %}
+    </div>
+    <div class="card-sub">at current min payments</div>
+  </div>
+</section>
+
+<section class="panel chart-panel">
+  <div class="panel-head">&gt;&gt; DEBT PAYOFF — PROJECTED</div>
+  {% if chart.n > 1 %}
+  <svg class="chart" viewBox="0 0 {{ chart.width }} {{ chart.height }}" preserveAspectRatio="none">
+    <path class="chart-area" d="{{ chart.area }}" />
+    <path class="chart-line" d="{{ chart.line }}" />
+  </svg>
+  <div class="chart-axis">
+    <span>{{ fmt(chart.hi) }}</span>
+    <span>now → {{ payoff_months }} months</span>
+    <span>{{ fmt(chart.lo) }}</span>
+  </div>
+  {% else %}
+  <div class="empty">No debts yet — add some in <a href="{{ base }}/manage#debts">MANAGE</a> to see a payoff curve.</div>
+  {% endif %}
+</section>
+
+<section class="grid-2">
+  {% for check in ['14th', '28th'] %}
+  <div class="panel">
+    <div class="panel-head">&gt;&gt; BILLS — {{ check }} CHECK</div>
+    <table class="tbl">
+      <thead><tr><th>BILL</th><th>DUE</th><th class="r">AMOUNT</th></tr></thead>
+      <tbody>
+        {% for b in env[check].bills %}
+        <tr>
+          <td>{{ b.name }}</td>
+          <td class="muted">{{ b.due_day }}</td>
+          <td class="r">{{ fmt(b.amount_cents) }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="3" class="muted">no bills assigned</td></tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr><td>TOTAL</td><td></td><td class="r">{{ fmt(env[check].assigned) }}</td></tr>
+        <tr><td>REMAINING</td><td></td>
+            <td class="r {{ 'neg' if env[check].remaining < 0 else 'pos' }}">{{ fmt(env[check].remaining) }}</td></tr>
+      </tfoot>
+    </table>
+  </div>
+  {% endfor %}
+</section>
+
+{% endblock %}
