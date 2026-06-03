@@ -35,3 +35,34 @@
     }
   });
 })();
+
+/* ---- earner accordion toggle ----
+   Buttons with class "earner-toggle" and data-target="earner-body-{id}"
+   collapse/expand the earner card body. */
+(function () {
+  document.addEventListener("click", function (e) {
+    var btn = e.target.closest(".earner-toggle");
+    if (!btn) return;
+    var targetId = btn.getAttribute("data-target");
+    var body = document.getElementById(targetId);
+    if (!body) return;
+    var collapsed = body.style.display === "none";
+    body.style.display = collapsed ? "" : "none";
+    btn.textContent = collapsed ? "▾" : "▸";
+  });
+})();
+
+/* ---- earner prefill for income-add modal ----
+   Buttons with data-prefill-earner="{id}" trigger the income modal
+   and pre-select that earner in the dropdown after a short delay. */
+(function () {
+  document.addEventListener("click", function (e) {
+    var btn = e.target.closest("[data-prefill-earner]");
+    if (!btn) return;
+    var earnerId = btn.getAttribute("data-prefill-earner");
+    setTimeout(function () {
+      var sel = document.querySelector("#m-income-add select[name='earner_id']");
+      if (sel) sel.value = earnerId;
+    }, 50);
+  });
+})();

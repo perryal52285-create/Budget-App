@@ -4,57 +4,62 @@
 <p class="page-intro">Your recurring setup lives here. Add things with the <b>+ buttons</b> (they pop out) so the
 page stays tidy; changes save instantly and flow into every month's view.</p>
 
-<!-- EARNERS -->
+<!-- EARNERS & INCOME -->
 <section class="panel" id="earners">
   <div class="sec-head">
-    <div class="panel-head" data-emoji="👥">&gt;&gt; EARNERS</div>
+    <div class="panel-head" data-emoji="👥">&gt;&gt; EARNERS &amp; INCOME</div>
     <button class="btn" type="button" data-modal-open="m-earner-add">+ Add earner</button>
   </div>
-  <div class="chip-grid">
-    {% for e in earners %}
-    <form class="chip" method="post" action="{{ base }}/manage/earners/{{ e.id }}/update">
-      <span class="chip-dot" style="background: {{ e.color }}"></span>
-      <input name="name" value="{{ e.name }}" class="chip-name">
-      <input type="color" name="color" value="{{ e.color }}">
-      <button class="btn-sm" type="submit">save</button>
-      {% if not e.is_primary %}
-      <button class="btn-x" type="submit" formaction="{{ base }}/manage/earners/{{ e.id }}/delete">✕</button>
-      {% endif %}
-    </form>
-    {% endfor %}
-  </div>
-</section>
+  <p class="hint">Each earner gets their own income sources. Click the arrow to expand/collapse. Use
+    <b>+ Add income for [name]</b> to attach a paycheck or reimbursement to that person.</p>
 
-<!-- INCOME -->
-<section class="panel" id="income">
-  <div class="sec-head">
-    <div class="panel-head" data-emoji="💵">&gt;&gt; INCOME / PAYCHECKS</div>
-    <button class="btn" type="button" data-modal-open="m-income-add">+ Add income</button>
+  {% for e in earners %}
+  {% set esources = sources | selectattr('earner_id', 'equalto', e.id) | list %}
+  <div class="earner-card" style="--earner-color: {{ e.color }}; border-left-color: {{ e.color }}">
+    <div class="earner-card-head">
+      <span class="earner-dot" style="background: {{ e.color }}"></span>
+      <span class="earner-name">{{ e.name }}</span>
+      <div class="earner-card-actions">
+        <button class="btn-sm" type="button" data-modal-open="m-earner-edit-{{ e.id }}">edit</button>
+        {% if not e.is_primary %}
+        <form method="post" action="{{ base }}/manage/earners/{{ e.id }}/delete" class="inline"
+              onsubmit="return confirm('Delete {{ e.name }} and all their income sources?')">
+          <button class="btn-x" type="submit">✕</button>
+        </form>
+        {% endif %}
+        <button class="btn-sm earner-toggle" type="button" data-target="earner-body-{{ e.id }}">▾</button>
+      </div>
+    </div>
+    <div class="earner-card-body" id="earner-body-{{ e.id }}">
+      <table class="tbl">
+        <thead><tr><th>NAME</th><th>EMPLOYER</th><th>FREQ</th><th class="r">AMOUNT</th><th>NEXT DATES</th><th></th></tr></thead>
+        <tbody>
+          {% for s in esources %}
+          <tr>
+            <td>{{ s.name }}</td>
+            <td class="muted">{{ s.employer or '—' }}</td>
+            <td class="muted">{{ s.frequency }}</td>
+            <td class="r">{{ fmt(s.amount_cents) }}</td>
+            <td class="muted">{% for d in s.preview[:2] %}<code>{{ d.strftime('%b %-d') }}</code> {% else %}—{% endfor %}</td>
+            <td class="r nowrap">
+              <button class="btn-sm" type="button" data-modal-open="m-src-{{ s.id }}">edit</button>
+              <form method="post" action="{{ base }}/manage/income/{{ s.id }}/delete" class="inline"
+                    onsubmit="return confirm('Delete {{ s.name }}?')"><button class="btn-x" type="submit">✕</button></form>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="6" class="muted">no income sources yet — add one below</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <div class="earner-card-foot">
+        <button class="btn" type="button" data-modal-open="m-income-add" data-prefill-earner="{{ e.id }}">+ Add income for {{ e.name }}</button>
+      </div>
+    </div>
   </div>
-  <p class="hint">Biweekly repeats every 14 days from the <b>anchor date</b> — that's what creates the
-    3-paycheck months. <b>Motus</b> is a reimbursement that rides your payroll checks.</p>
-  <table class="tbl">
-    <thead><tr><th>NAME</th><th>EMPLOYER</th><th>WHO</th><th>FREQUENCY</th><th class="r">AMOUNT</th><th>NEXT</th><th></th></tr></thead>
-    <tbody>
-      {% for s in sources %}
-      <tr>
-        <td>{{ s.name }}</td>
-        <td class="muted">{{ s.employer or '—' }}</td>
-        <td class="muted">{{ (earners | selectattr('id','equalto', s.earner_id) | map(attribute='name') | first) or '?' }}</td>
-        <td class="muted">{{ s.frequency }}</td>
-        <td class="r">{{ fmt(s.amount_cents) }}</td>
-        <td class="muted">{% for d in s.preview[:2] %}<code>{{ d.strftime('%b %-d') }}</code>{% else %}—{% endfor %}</td>
-        <td class="r nowrap">
-          <button class="btn-sm" type="button" data-modal-open="m-src-{{ s.id }}">edit</button>
-          <form method="post" action="{{ base }}/manage/income/{{ s.id }}/delete" class="inline"
-                onsubmit="return confirm('Delete {{ s.name }}?')"><button class="btn-x" type="submit">✕</button></form>
-        </td>
-      </tr>
-      {% else %}
-      <tr><td colspan="7" class="muted">no income yet — add one above</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  {% else %}
+  <div class="empty">No earners yet — add one above.</div>
+  {% endfor %}
 </section>
 
 <!-- BILLS -->
@@ -143,12 +148,26 @@ page stays tidy; changes save instantly and flow into every month's view.</p>
   <div class="modal-card">
     <div class="modal-head"><span data-emoji="👥">Add earner</span><button class="modal-x" type="button" data-modal-close>✕</button></div>
     <form class="form" method="post" action="{{ base }}/manage/earners/add">
-      <label>Name <input name="name" required placeholder="name"></label>
+      <label>Name <input name="name" required placeholder="e.g. Alex"></label>
       <label>Color <input type="color" name="color" value="#7c5cff"></label>
       <div class="modal-foot"><button class="btn" type="submit">+ Add earner</button></div>
     </form>
   </div>
 </div>
+
+<!-- edit earner (one per earner) -->
+{% for e in earners %}
+<div class="modal" id="m-earner-edit-{{ e.id }}" hidden>
+  <div class="modal-card">
+    <div class="modal-head"><span data-emoji="👥">Edit earner · {{ e.name }}</span><button class="modal-x" type="button" data-modal-close>✕</button></div>
+    <form class="form" method="post" action="{{ base }}/manage/earners/{{ e.id }}/update">
+      <label>Name <input name="name" value="{{ e.name }}" required></label>
+      <label>Color <input type="color" name="color" value="{{ e.color }}"></label>
+      <div class="modal-foot"><button class="btn" type="submit">Save changes</button></div>
+    </form>
+  </div>
+</div>
+{% endfor %}
 
 <!-- add income -->
 <div class="modal" id="m-income-add" hidden>
@@ -156,7 +175,7 @@ page stays tidy; changes save instantly and flow into every month's view.</p>
     <div class="modal-head"><span data-emoji="💵">Add income source</span><button class="modal-x" type="button" data-modal-close>✕</button></div>
     <form class="form" method="post" action="{{ base }}/manage/income/add">
       <div class="src-grid">
-        <label>Name <input name="name" required placeholder="e.g. Rae Payroll"></label>
+        <label>Name <input name="name" required placeholder="e.g. Alex Payroll"></label>
         <label>Employer <input name="employer" placeholder="employer"></label>
         <label>Earner <select name="earner_id">{% for e in earners %}<option value="{{ e.id }}">{{ e.name }}</option>{% endfor %}</select></label>
         <label>Kind <select name="kind">{% for k in kinds %}<option value="{{ k }}">{{ k }}</option>{% endfor %}</select></label>

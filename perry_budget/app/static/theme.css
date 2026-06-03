@@ -377,25 +377,248 @@ body.modal-open { overflow: hidden; }
 .modal-foot { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }
 @media (max-width: 520px) { .modal .src-grid { grid-template-columns: 1fr; } }
 
+/* ---------- earner accordion cards ---------- */
+.earner-card {
+  border: 1px solid var(--border-soft);
+  border-left: 4px solid var(--accent);
+  border-radius: var(--card-radius);
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+.earner-card-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; background: var(--panel-2);
+  cursor: default;
+}
+.earner-dot {
+  width: 14px; height: 14px; border-radius: 50%; flex: none;
+}
+.earner-dot-sm {
+  display: inline-block; width: 9px; height: 9px;
+  border-radius: 50%; flex: none; margin-right: 4px;
+  vertical-align: middle; position: relative; top: -1px;
+}
+.earner-name {
+  font-weight: 800; flex: 1;
+  text-transform: var(--upper); letter-spacing: var(--tracking);
+}
+.earner-card-actions { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+.earner-card-body { padding: 12px 14px; }
+.earner-card-foot { padding-top: 10px; }
+
+/* ---------- full-width donut ---------- */
+.donut-panel-full { }
+.donut-wrap-full {
+  display: flex; gap: 32px; align-items: center;
+  flex-wrap: wrap; justify-content: center; padding: 8px 0;
+}
+.donut-big { width: 300px; height: 300px; flex: none; }
+.donut-legend-full {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; flex-direction: column; gap: 9px;
+  font-size: 14px; flex: 1; min-width: 200px;
+}
+.donut-legend-full li { display: flex; align-items: center; gap: 10px; }
+.donut-leg-label { flex: 1; font-weight: 700; text-transform: var(--upper); letter-spacing: var(--tracking); }
+.donut-pct { font-size: 13px; }
+
+/* ---------- dash row ---------- */
+.dash-row {
+  display: grid; gap: var(--gap);
+  grid-template-columns: 1fr 1fr; margin-bottom: 22px;
+}
+.dash-row .panel { margin-bottom: 0; }
+@media (max-width: 860px) { .dash-row { grid-template-columns: 1fr; } }
+
+/* ---------- theme visibility toggle ---------- */
+[data-theme="dark"]  .terminal-hide { display: none; }
+[data-theme="light"] .bubbly-hide   { display: none; }
+
+
 /* ============================================================
    BUBBLY (light) only — emoji + playful motion. Terminal stays clean.
    ============================================================ */
 [data-theme="light"] .panel-head[data-emoji]::before { content: attr(data-emoji) " "; }
-[data-theme="light"] .brand::after { content: " ✨"; }
 [data-theme="light"] .nav a[href$="/"]::before,
 [data-theme="light"] .nav a[href$="manage"]::before { content: ""; }
-[data-theme="light"] .btn::after { content: " 💖"; }
 [data-theme="light"] .btn-sm::after { content: " ✅"; }
 [data-theme="light"] .navbtn:hover { transform: scale(1.04); }
 [data-theme="light"] .card { transition: transform 0.15s ease; }
 [data-theme="light"] .card:hover { transform: translateY(-3px) rotate(-0.4deg); }
-[data-theme="light"] .check:hover { transform: translateY(-2px); transition: transform 0.15s ease; }
 
 @keyframes wiggle {
   0%, 100% { transform: rotate(0deg); }
   25% { transform: rotate(1.5deg); }
   75% { transform: rotate(-1.5deg); }
 }
-[data-theme="light"] .btn:hover, [data-theme="light"] .btn-sm:hover { animation: wiggle 0.4s ease; }
+[data-theme="light"] .btn:hover { animation: wiggle 0.4s ease; }
 [data-theme="light"] .monthtitle::before { content: "🗓️ "; }
 [data-theme="light"] .empty::after { content: " 🌸"; }
+
+/* -- animated body background -- */
+@keyframes bg-drift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+[data-theme="light"] body {
+  background-image: linear-gradient(135deg, #ffe6f3 0%, #ede7ff 25%, #e3f4ff 50%, #fff9e6 75%, #ffd0e6 100%);
+  background-size: 400% 400%;
+  animation: bg-drift 14s ease infinite;
+}
+
+/* -- rainbow brand -- */
+@keyframes rainbow-shift {
+  from { background-position: 0% center; }
+  to   { background-position: 200% center; }
+}
+[data-theme="light"] .brand {
+  background: linear-gradient(90deg, #ff79b0, #b57bee, #5bc8ff, #7ed957, #ffb347, #ff79b0);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: rainbow-shift 3s linear infinite;
+  text-shadow: none;
+}
+[data-theme="light"] .brand::before {
+  content: "🐱 ";
+  -webkit-text-fill-color: initial;
+  background: none; -webkit-background-clip: initial; background-clip: initial;
+}
+[data-theme="light"] .brand::after {
+  content: " ✨";
+  -webkit-text-fill-color: initial;
+  background: none; -webkit-background-clip: initial; background-clip: initial;
+}
+
+/* -- nav emoji prefixes -- */
+[data-theme="light"] .nav a[href="/"]::before,
+[data-theme="light"] .nav a[href*="?year"]::before,
+[data-theme="light"] .nav a[href$="/"]::before { content: "🏠 "; }
+[data-theme="light"] .nav a[href*="budgets"]::before { content: "📊 "; }
+[data-theme="light"] .nav a[href*="term"]::before   { content: "🐾 "; }
+[data-theme="light"] .nav a[href*="manage"]::before { content: "⚙️ "; }
+[data-theme="light"] .nav a { padding: 6px 10px; border-radius: 999px; transition: background 0.15s ease; }
+[data-theme="light"] .nav a:hover { background: rgba(181,123,238,0.12); }
+
+/* -- pill buttons + gradient -- */
+[data-theme="light"] .btn {
+  border-radius: 999px;
+  background: linear-gradient(135deg, #ff79b0, #b57bee);
+  color: #fff !important;
+  box-shadow: 0 4px 12px rgba(181, 123, 238, 0.35);
+  text-shadow: none;
+}
+[data-theme="light"] .btn::after { content: " 💖"; }
+[data-theme="light"] .btn:hover {
+  filter: brightness(1.06);
+  box-shadow: 0 6px 18px rgba(181, 123, 238, 0.5);
+}
+[data-theme="light"] .btn-sm {
+  border-radius: 999px;
+  background: linear-gradient(135deg, #ffd0e6, #ede7ff);
+  color: #7c5cff !important;
+  border: none;
+}
+[data-theme="light"] .btn-sm:hover { animation: wiggle 0.4s ease; }
+
+/* -- colored card left-borders + entrance animation -- */
+@keyframes pop-in {
+  from { transform: translateY(8px) scale(0.96); opacity: 0; }
+  to   { transform: none; opacity: 1; }
+}
+[data-theme="light"] .cards .card:nth-child(1) { border-left: 4px solid #ff79b0; animation: pop-in 0.3s ease 0.05s both; }
+[data-theme="light"] .cards .card:nth-child(2) { border-left: 4px solid #ffb347; animation: pop-in 0.3s ease 0.10s both; }
+[data-theme="light"] .cards .card:nth-child(3) { border-left: 4px solid #7ed957; animation: pop-in 0.3s ease 0.15s both; }
+[data-theme="light"] .cards .card:nth-child(4) { border-left: 4px solid #5bc8ff; animation: pop-in 0.3s ease 0.20s both; }
+[data-theme="light"] .cards .card:nth-child(5) { border-left: 4px solid #b57bee; animation: pop-in 0.3s ease 0.25s both; }
+
+/* -- panel hover rainbow glow -- */
+[data-theme="light"] .panel {
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+[data-theme="light"] .panel:hover {
+  box-shadow: 0 12px 28px rgba(181, 123, 238, 0.22), 0 0 0 1px #e0b8ff;
+  border-color: #e0b8ff;
+}
+
+/* -- gradient panel-heads -- */
+[data-theme="light"] .panel-head {
+  background: linear-gradient(90deg, #ff79b0, #b57bee);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-shadow: none;
+}
+
+/* -- rounded, pastel alerts -- */
+[data-theme="light"] .alert { border-radius: 16px; }
+[data-theme="light"] .alert-warn { background: #fff0f3; border-left-color: #ff79b0; }
+[data-theme="light"] .alert-info  { background: #f0f0ff; border-left-color: #b57bee; }
+
+/* -- monthtitle bigger -- */
+[data-theme="light"] .monthtitle { font-size: 26px; }
+
+/* -- floating sparkle in topbar -- */
+@keyframes sparkle-float {
+  0%, 100% { transform: translateY(0) rotate(0deg); opacity: 1; }
+  50%       { transform: translateY(-7px) rotate(10deg); opacity: 0.7; }
+}
+[data-theme="light"] .topbar { position: relative; }
+[data-theme="light"] .topbar::after {
+  content: "✨";
+  position: absolute; right: 22px; top: 14px;
+  font-size: 20px; pointer-events: none;
+  animation: sparkle-float 2.8s ease-in-out infinite;
+}
+
+/* -- earner cards in bubbly -- */
+[data-theme="light"] .earner-card { border-radius: 16px; animation: pop-in 0.3s ease both; }
+[data-theme="light"] .earner-card-head { border-radius: 16px 16px 0 0; }
+
+/* ── BUBBLY donut: rainbow segments ── */
+[data-theme="light"] .donut-big circle:nth-child(2) { stroke: #ff79b0 !important; }
+[data-theme="light"] .donut-big circle:nth-child(3) { stroke: #ffb347 !important; }
+[data-theme="light"] .donut-big circle:nth-child(4) { stroke: #ffe066 !important; }
+[data-theme="light"] .donut-big circle:nth-child(5) { stroke: #7ed957 !important; }
+[data-theme="light"] .donut-big circle:nth-child(6) { stroke: #5bc8ff !important; }
+[data-theme="light"] .donut-big circle:nth-child(7) { stroke: #b57bee !important; }
+[data-theme="light"] .donut-big circle:nth-child(8) { stroke: #ff6b6b !important; }
+[data-theme="light"] .donut-big circle:nth-child(9) { stroke: #46d970 !important; }
+
+/* -- legend emoji via data-cat attribute -- */
+[data-theme="light"] .donut-legend-full li::before             { content: "💸 "; }
+[data-theme="light"] .donut-legend-full li[data-cat*="housing"]::before { content: "🏠 "; }
+[data-theme="light"] .donut-legend-full li[data-cat*="utilit"]::before  { content: "⚡ "; }
+[data-theme="light"] .donut-legend-full li[data-cat*="food"]::before    { content: "🍕 "; }
+[data-theme="light"] .donut-legend-full li[data-cat*="grocer"]::before  { content: "🛒 "; }
+[data-theme="light"] .donut-legend-full li[data-cat*="car"]::before     { content: "🚗 "; }
+[data-theme="light"] .donut-legend-full li[data-cat*="auto"]::before    { content: "🚗 "; }
+[data-theme="light"] .donut-legend-full li[data-cat*="subscri"]::before { content: "📱 "; }
+[data-theme="light"] .donut-legend-full li[data-cat*="insur"]::before   { content: "🛡️ "; }
+[data-theme="light"] .donut-legend-full li[data-cat*="left"]::before    { content: "💰 "; }
+[data-theme="light"] .donut-legend-full li[data-cat*="debt"]::before    { content: "💳 "; }
+[data-theme="light"] .donut-legend-full li[data-cat*="entertain"]::before { content: "🎉 "; }
+[data-theme="light"] .donut-legend-full li[data-cat*="health"]::before  { content: "💊 "; }
+[data-theme="light"] .donut-legend-full li[data-cat*="spend"]::before   { content: "🛍️ "; }
+
+/* -- bubbly donut center cat -- */
+[data-theme="light"] .donut-center { font-size: 44px; fill: var(--text); }
+
+
+/* ============================================================
+   TERMINAL (dark) — phosphor donut with pulse-glow
+   ============================================================ */
+@keyframes pulse-glow {
+  0%, 100% { filter: drop-shadow(0 0 3px rgba(70, 217, 112, 0.45)); }
+  50%       { filter: drop-shadow(0 0 11px rgba(70, 217, 112, 0.95)); }
+}
+[data-theme="dark"] .donut-big circle:nth-child(2) { stroke: #46d970 !important; animation: pulse-glow 2.5s ease-in-out infinite; }
+[data-theme="dark"] .donut-big circle:nth-child(3) { stroke: #2c9a52 !important; animation: pulse-glow 2.5s ease-in-out 0.35s infinite; }
+[data-theme="dark"] .donut-big circle:nth-child(4) { stroke: #5bffa0 !important; animation: pulse-glow 2.5s ease-in-out 0.70s infinite; }
+[data-theme="dark"] .donut-big circle:nth-child(5) { stroke: #1a7a3a !important; animation: pulse-glow 2.5s ease-in-out 1.05s infinite; }
+[data-theme="dark"] .donut-big circle:nth-child(6) { stroke: #78ffbb !important; animation: pulse-glow 2.5s ease-in-out 1.40s infinite; }
+[data-theme="dark"] .donut-big circle:nth-child(7) { stroke: #0d5c2e !important; animation: pulse-glow 2.5s ease-in-out 1.75s infinite; }
+[data-theme="dark"] .donut-big circle:nth-child(8) { stroke: #e3b341 !important; animation: pulse-glow 2.5s ease-in-out 2.10s infinite; }
+[data-theme="dark"] .donut-big circle:nth-child(9) { stroke: #46d970 !important; animation: pulse-glow 2.5s ease-in-out 2.45s infinite; }

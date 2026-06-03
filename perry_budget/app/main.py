@@ -84,12 +84,27 @@ def dashboard(request: Request, year: int = None, month: int = None):
     ny, nm = budget.shift_month(year, month, 1)
     months_, points = budget.snowball_projection()
     chart = budget.svg_area_chart(points)
-    donut = budget.donut_chart(budget.month_allocation(view))
+    donut = budget.donut_chart(budget.month_allocation(view), size=300, thickness=36)
+
+    # flatten all assigned + unassigned bills for the upcoming panel, sorted by due_dom
+    _seen: set = set()
+    upcoming = []
+    for p in view["paychecks"]:
+        for b in p["bills"]:
+            if b["id"] not in _seen:
+                _seen.add(b["id"])
+                upcoming.append({**b, "earner_color": p["color"], "earner_name": p["earner_name"]})
+    for b in view["unassigned"]:
+        if b["id"] not in _seen:
+            _seen.add(b["id"])
+            upcoming.append({**b, "earner_color": "#888", "earner_name": "unassigned"})
+    upcoming.sort(key=lambda b: b.get("due_dom") or 99)
 
     return templates.TemplateResponse("dashboard.html", ctx(
         request,
         view=view,
         donut=donut,
+        upcoming=upcoming,
         prev={"year": py, "month": pm},
         next={"year": ny, "month": nm},
         is_current=(year, month) == (cy, cm),
@@ -253,7 +268,7 @@ async def add_income(request: Request):
         "INSERT INTO income_sources (earner_id, name, employer, kind, amount_cents, frequency,"
         " anchor_date, day1, day2, month, active, notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
         _income_fields(f))
-    return back(request, "#income")
+    return back(request, "#earners")
 
 
 @app.post("/manage/income/{source_id}/update")
@@ -263,13 +278,13 @@ async def update_income(request: Request, source_id: int):
     db.execute(
         "UPDATE income_sources SET earner_id=?, name=?, employer=?, kind=?, amount_cents=?,"
         " frequency=?, anchor_date=?, day1=?, day2=?, month=?, active=?, notes=? WHERE id=?", vals)
-    return back(request, "#income")
+    return back(request, "#earners")
 
 
 @app.post("/manage/income/{source_id}/delete")
 def delete_income(request: Request, source_id: int):
     db.execute("DELETE FROM income_sources WHERE id=?", (source_id,))
-    return back(request, "#income")
+    return back(request, "#earners")
 
 
 # ---- bills ---------------------------------------------------------------

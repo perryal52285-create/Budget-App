@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.2
+- **Earner accordion cards** — Manage page now groups each person's income sources under their
+  own collapsible card. Click ▾ to expand/collapse; "Add income for [Name]" pre-selects that
+  earner in the pop-out.
+- **Dashboard redesign** — removed per-paycheck detail clutter. New layout: big allocation
+  donut (full-width) → upcoming bills by due day + income dates side-by-side → debt chart.
+  Record-actual moved to clean modal pop-outs (✎ button per paycheck row).
+- **Bubbly full-tilt** — animated gradient background, rainbow cycling brand text with 🐱,
+  pill-shaped gradient buttons, sparkle floating in topbar, colored card left-borders with
+  staggered entrance, rainbow panel-heads, earner card pop-in, pastel alerts.
+- **Bubbly donut** — rainbow segment colors, emoji legend (🏠⚡🚗💰…), 🐱 emoji center.
+- **Terminal donut** — phosphor green shade segments with oscillating pulse-glow animation.
+
 ## 0.3.1
 - **Fix:** adding a bill failed with "Internal Server Error" on databases that
   carried over from an earlier install — the `bills` table was missing the
