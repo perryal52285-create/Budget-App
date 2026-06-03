@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.3
+- **Fix:** the allocation donut rendered huge and showed both the 🐱 and the income
+  number at once. Cause was the browser serving a stale cached `theme.css` from before
+  the redesign. Static CSS/JS are now cache-busted by version (`?v=`), so each update
+  forces a fresh stylesheet — the donut sizes correctly (300px) and the dual-theme
+  center label shows just one element per theme.
+
 ## 0.3.2
 - **Earner accordion cards** — Manage page now groups each person's income sources under their
   own collapsible card. Click ▾ to expand/collapse; "Add income for [Name]" pre-selects that

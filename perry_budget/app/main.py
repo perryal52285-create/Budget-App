@@ -14,6 +14,21 @@ app.mount("/static", StaticFiles(directory=os.path.join(BASE, "static")), name="
 templates = Jinja2Templates(directory=os.path.join(BASE, "templates"))
 
 
+def _read_version() -> str:
+    """Read the add-on version from config.yaml (used to cache-bust static assets)."""
+    try:
+        with open(os.path.join(BASE, "..", "config.yaml"), encoding="utf-8") as f:
+            for line in f:
+                if line.strip().startswith("version:"):
+                    return line.split(":", 1)[1].strip().strip('"').strip("'")
+    except OSError:
+        pass
+    return "dev"
+
+
+VERSION = _read_version()
+
+
 @app.on_event("startup")
 def _startup():
     db.init_db()
@@ -27,6 +42,7 @@ def ctx(request: Request, **extra):
         "now_str": now.strftime("%a %b %-d, %Y · %-I:%M %p"),
         "tz_name": db.get_setting("timezone", "America/Chicago"),
         "month_names": budget.MONTH_NAMES,
+        "version": VERSION,
     }
     data.update(extra)
     return data
