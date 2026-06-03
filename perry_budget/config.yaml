@@ -1,7 +1,7 @@
 name: Perry Budget
-version: "0.1.0"
+version: "0.2.0"
 slug: perry_budget
-description: Per-paycheck envelope budget with debt snowball. Terminal (dark) + bubbly (light) themes.
+description: Biweekly pay-date engine, two earners, hybrid bill funding, debt snowball, monthly history. Terminal (dark) + bubbly (light) themes.
 url: https://github.com/perryal52285-create/Budget-App
 arch:
   - aarch64
