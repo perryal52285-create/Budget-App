@@ -1,84 +1,120 @@
 {% extends "base.html" %}
 {% block content %}
 
+<section class="monthnav">
+  <a class="navbtn" href="{{ base }}/?year={{ prev.year }}&month={{ prev.month }}">‹ {{ month_names[prev.month] }}</a>
+  <div class="monthtitle">
+    {{ view.label }}
+    {% if is_current %}<span class="tag now">this month</span>{% endif %}
+    {% if view.month in three_check %}<span class="tag extra">3-paycheck month</span>{% endif %}
+  </div>
+  <a class="navbtn" href="{{ base }}/?year={{ next.year }}&month={{ next.month }}">{{ month_names[next.month] }} ›</a>
+</section>
+
 <section class="cards">
   <div class="card">
-    <div class="card-label">AVAILABLE — 14TH</div>
-    <div class="card-value {{ 'neg' if env['14th'].remaining < 0 else 'pos' }}">
-      {{ fmt(env['14th'].remaining) }}
-    </div>
-    <div class="card-sub">of {{ fmt(env['14th'].available) }} in</div>
+    <div class="card-label">INCOME THIS MONTH</div>
+    <div class="card-value pos">{{ fmt(view.total_in) }}</div>
+    <div class="card-sub">{{ view.paychecks|length }} paychecks</div>
   </div>
   <div class="card">
-    <div class="card-label">AVAILABLE — 28TH</div>
-    <div class="card-value {{ 'neg' if env['28th'].remaining < 0 else 'pos' }}">
-      {{ fmt(env['28th'].remaining) }}
-    </div>
-    <div class="card-sub">of {{ fmt(env['28th'].available) }} in</div>
+    <div class="card-label">BILLS ASSIGNED</div>
+    <div class="card-value">{{ fmt(view.total_bills) }}</div>
+    <div class="card-sub">across all checks</div>
   </div>
   <div class="card">
-    <div class="card-label">REMAINING — MONTH</div>
-    <div class="card-value {{ 'neg' if env.monthly.remaining < 0 else 'pos' }}">
-      {{ fmt(env.monthly.remaining) }}
-    </div>
-    <div class="card-sub">{{ fmt(env.monthly.assigned) }} in bills</div>
+    <div class="card-label">REMAINING</div>
+    <div class="card-value {{ 'neg' if view.remaining < 0 else 'pos' }}">{{ fmt(view.remaining) }}</div>
+    <div class="card-sub">income − bills</div>
   </div>
   <div class="card">
     <div class="card-label">TOTAL DEBT</div>
     <div class="card-value neg">{{ fmt(total_debt) }}</div>
-    <div class="card-sub">snowball target: {{ next_target or '—' }}</div>
+    <div class="card-sub">target: {{ next_target or '—' }}</div>
   </div>
   <div class="card">
     <div class="card-label">PROJECTED PAYOFF</div>
-    <div class="card-value accent">
-      {% if payoff_months %}{{ payoff_months }} mo{% else %}—{% endif %}
-    </div>
-    <div class="card-sub">at current min payments</div>
+    <div class="card-value accent">{% if payoff_months %}{{ payoff_months }} mo{% else %}—{% endif %}</div>
+    <div class="card-sub">at current minimums</div>
   </div>
 </section>
 
 <section class="panel chart-panel">
-  <div class="panel-head">&gt;&gt; DEBT PAYOFF — PROJECTED</div>
+  <div class="panel-head" data-emoji="📊">&gt;&gt; DEBT PAYOFF — PROJECTED</div>
   {% if chart.n > 1 %}
   <svg class="chart" viewBox="0 0 {{ chart.width }} {{ chart.height }}" preserveAspectRatio="none">
     <path class="chart-area" d="{{ chart.area }}" />
     <path class="chart-line" d="{{ chart.line }}" />
   </svg>
-  <div class="chart-axis">
-    <span>{{ fmt(chart.hi) }}</span>
-    <span>now → {{ payoff_months }} months</span>
-    <span>{{ fmt(chart.lo) }}</span>
-  </div>
+  <div class="chart-axis"><span>{{ fmt(chart.hi) }}</span><span>now → {{ payoff_months }} mo</span><span>{{ fmt(chart.lo) }}</span></div>
   {% else %}
-  <div class="empty">No debts yet — add some in <a href="{{ base }}/manage#debts">MANAGE</a> to see a payoff curve.</div>
+  <div class="empty">No debts yet — add some in <a href="{{ base }}/manage#debts">MANAGE</a>.</div>
   {% endif %}
 </section>
 
-<section class="grid-2">
-  {% for check in ['14th', '28th'] %}
-  <div class="panel">
-    <div class="panel-head">&gt;&gt; BILLS — {{ check }} CHECK</div>
+<section class="checks">
+  {% for p in view.paychecks %}
+  <div class="panel check {{ 'is-extra' if p.is_extra }}" style="border-left: 4px solid {{ p.color }}">
+    <div class="check-head">
+      <div>
+        <span class="check-earner" style="color: {{ p.color }}">{{ p.earner_name }}</span>
+        <span class="check-date">{{ p.date.strftime('%a %b %-d') }}</span>
+        {% if p.is_extra %}<span class="tag extra">EXTRA · surplus</span>{% endif %}
+        {% if p.is_actual %}<span class="tag now">actual</span>{% endif %}
+      </div>
+      <div class="check-amt {{ 'neg' if p.remaining < 0 else 'pos' }}">{{ fmt(p.remaining) }} left</div>
+    </div>
+    <div class="check-sub">
+      {{ p.source_name }} · in {{ fmt(p.amount_cents) }}
+      {% if p.reimb_cents %}<span class="muted">(+{{ fmt(p.reimb_cents) }} {{ p.reimb_name }})</span>{% endif %}
+    </div>
+
+    {% if p.is_extra %}
+    <div class="extra-note">3rd check — no bills auto-assigned. Consider snowball/savings. 💪</div>
+    {% endif %}
+
     <table class="tbl">
-      <thead><tr><th>BILL</th><th>DUE</th><th class="r">AMOUNT</th></tr></thead>
       <tbody>
-        {% for b in env[check].bills %}
+        {% for b in p.bills %}
         <tr>
-          <td>{{ b.name }}</td>
-          <td class="muted">{{ b.due_day }}</td>
+          <td>{{ b.name }}{% if b.autopay %} <span class="tag">auto</span>{% endif %}</td>
+          <td class="muted">due {{ b.due_dom }}</td>
           <td class="r">{{ fmt(b.amount_cents) }}</td>
         </tr>
         {% else %}
-        <tr><td colspan="3" class="muted">no bills assigned</td></tr>
+        <tr><td colspan="3" class="muted">no bills on this check</td></tr>
         {% endfor %}
       </tbody>
-      <tfoot>
-        <tr><td>TOTAL</td><td></td><td class="r">{{ fmt(env[check].assigned) }}</td></tr>
-        <tr><td>REMAINING</td><td></td>
-            <td class="r {{ 'neg' if env[check].remaining < 0 else 'pos' }}">{{ fmt(env[check].remaining) }}</td></tr>
-      </tfoot>
     </table>
+
+    <form class="actual" method="post" action="{{ base }}/period/paycheck/save">
+      <input type="hidden" name="year" value="{{ view.year }}">
+      <input type="hidden" name="month" value="{{ view.month }}">
+      <input type="hidden" name="source_id" value="{{ p.source_id }}">
+      <input type="hidden" name="occurrence" value="{{ p.occurrence }}">
+      <span class="actual-label">record actual:</span>
+      <input name="amount" placeholder="net" value="{{ '%.2f'|format(p.base_cents/100) }}" size="8">
+      {% if p.kind == 'payroll' %}<input name="motus" placeholder="motus" value="{{ '%.2f'|format(p.reimb_cents/100) }}" size="8">{% endif %}
+      <button class="btn-sm" type="submit">save</button>
+    </form>
   </div>
+  {% else %}
+  <div class="panel empty">No paychecks land in {{ view.label }}. Set up income in
+    <a href="{{ base }}/manage#income">MANAGE</a>.</div>
   {% endfor %}
 </section>
+
+{% if view.unassigned %}
+<section class="panel">
+  <div class="panel-head" data-emoji="⚠️">&gt;&gt; UNFUNDED BILLS</div>
+  <table class="tbl">
+    <tbody>
+      {% for b in view.unassigned %}
+      <tr><td>{{ b.name }}</td><td class="muted">due {{ b.due_dom }}</td><td class="r">{{ fmt(b.amount_cents) }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
 
 {% endblock %}

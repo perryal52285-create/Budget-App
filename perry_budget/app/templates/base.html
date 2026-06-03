@@ -26,6 +26,11 @@
     </button>
   </header>
 
+  <div class="clockbar">
+    <span class="clock">{{ now_str }}</span>
+    <span class="clock-tz">{{ tz_name }}</span>
+  </div>
+
   <main class="wrap">
     {% block content %}{% endblock %}
   </main>

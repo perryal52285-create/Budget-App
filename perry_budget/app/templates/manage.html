@@ -1,64 +1,136 @@
 {% extends "base.html" %}
 {% block content %}
 
-<p class="page-intro">Edit every input here. Changes save to the budget instantly.</p>
+<p class="page-intro">Edit every input here. Changes save instantly and flow into each month's view.</p>
 
-<!-- INCOME -->
-<section class="panel" id="income">
-  <div class="panel-head">&gt;&gt; INCOME / PAYCHECKS</div>
-  <p class="hint">Net is your take-home for that check. <b>Motus</b> is the variable vehicle reimbursement — enter the actual amount each cycle.</p>
+<!-- EARNERS -->
+<section class="panel" id="earners">
+  <div class="panel-head" data-emoji="👥">&gt;&gt; EARNERS</div>
   <div class="grid-2">
-    {% for check in checks %}
-    {% set pc = (paychecks | selectattr('label', 'equalto', check) | list | first) %}
-    <form class="form" method="post" action="{{ base }}/manage/paychecks/save">
-      <div class="form-title">{{ check }} CHECK</div>
-      <input type="hidden" name="label" value="{{ check }}">
-      <label>Net take-home <input name="net" value="{{ '%.2f'|format((pc.net_cents/100) if pc else 0) }}"></label>
-      <label>Motus reimb. <input name="motus" value="{{ '%.2f'|format((pc.motus_cents/100) if pc else 0) }}"></label>
-      <label>Other income <input name="other" value="{{ '%.2f'|format((pc.other_cents/100) if pc else 0) }}"></label>
-      <button class="btn" type="submit">Save {{ check }}</button>
+    {% for e in earners %}
+    <form class="form row" method="post" action="{{ base }}/manage/earners/{{ e.id }}/update">
+      <label>Name <input name="name" value="{{ e.name }}"></label>
+      <label>Color <input type="color" name="color" value="{{ e.color }}"></label>
+      <button class="btn" type="submit">Save</button>
+      {% if not e.is_primary %}
+      <button class="btn-x" type="submit" formaction="{{ base }}/manage/earners/{{ e.id }}/delete">✕</button>
+      {% endif %}
     </form>
     {% endfor %}
   </div>
+  <form class="form row" method="post" action="{{ base }}/manage/earners/add">
+    <label>Add earner <input name="name" required placeholder="name"></label>
+    <label>Color <input type="color" name="color" value="#7c5cff"></label>
+    <button class="btn" type="submit">+ Add</button>
+  </form>
+</section>
+
+<!-- INCOME -->
+<section class="panel" id="income">
+  <div class="panel-head" data-emoji="💵">&gt;&gt; INCOME / PAYCHECKS (running schedule)</div>
+  <p class="hint">Biweekly uses the <b>anchor date</b> (next/any payday) and repeats every 14 days — that's
+    what creates the 3-paycheck months. <b>Motus</b> is a reimbursement that rides your payroll checks.</p>
+
+  {% for s in sources %}
+  <form class="form src" method="post" action="{{ base }}/manage/income/{{ s.id }}/update">
+    <div class="src-grid">
+      <label>Name <input name="name" value="{{ s.name }}"></label>
+      <label>Earner
+        <select name="earner_id">
+          {% for e in earners %}<option value="{{ e.id }}" {{ 'selected' if e.id == s.earner_id }}>{{ e.name }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Kind
+        <select name="kind">
+          {% for k in kinds %}<option value="{{ k }}" {{ 'selected' if k == s.kind }}>{{ k }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Frequency
+        <select name="frequency">
+          {% for f in frequencies %}<option value="{{ f }}" {{ 'selected' if f == s.frequency }}>{{ f }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Amount <input name="amount" value="{{ '%.2f'|format(s.amount_cents/100) }}"></label>
+      <label>Anchor date <input name="anchor_date" value="{{ s.anchor_date }}" placeholder="YYYY-MM-DD"></label>
+      <label>Day 1 <input name="day1" value="{{ s.day1 }}" size="3"></label>
+      <label>Day 2 <input name="day2" value="{{ s.day2 }}" size="3"></label>
+      <label>Month <input name="month" value="{{ s.month }}" size="3"></label>
+    </div>
+    <div class="src-foot">
+      <span class="preview">next: {% for d in s.preview %}<code>{{ d.strftime('%b %-d') }}</code>{% else %}<span class="muted">—</span>{% endfor %}</span>
+      <span class="spacer"></span>
+      <button class="btn" type="submit">Save</button>
+      <button class="btn-x" type="submit" formaction="{{ base }}/manage/income/{{ s.id }}/delete">✕</button>
+    </div>
+  </form>
+  {% endfor %}
+
+  <form class="form row addrow" method="post" action="{{ base }}/manage/income/add">
+    <label>New source <input name="name" required placeholder="e.g. Rae Payroll"></label>
+    <label>Earner
+      <select name="earner_id">{% for e in earners %}<option value="{{ e.id }}">{{ e.name }}</option>{% endfor %}</select>
+    </label>
+    <label>Kind
+      <select name="kind">{% for k in kinds %}<option value="{{ k }}">{{ k }}</option>{% endfor %}</select>
+    </label>
+    <label>Frequency
+      <select name="frequency">{% for f in frequencies %}<option value="{{ f }}" {{ 'selected' if f == 'biweekly' }}>{{ f }}</option>{% endfor %}</select>
+    </label>
+    <label>Amount <input name="amount" value="0.00"></label>
+    <label>Anchor <input name="anchor_date" placeholder="YYYY-MM-DD"></label>
+    <button class="btn" type="submit">+ Add</button>
+  </form>
 </section>
 
 <!-- BILLS -->
 <section class="panel" id="bills">
-  <div class="panel-head">&gt;&gt; BILLS</div>
+  <div class="panel-head" data-emoji="🧾">&gt;&gt; BILLS</div>
+  <p class="hint">Auto funding assigns each bill to the paycheck just before its due day (never the extra
+    3rd check). Switch to manual to pin it to a specific check.</p>
   <form class="form row" method="post" action="{{ base }}/manage/bills/add">
     <label>Name <input name="name" required></label>
     <label>Amount <input name="amount" value="0.00"></label>
-    <label>Due <input name="due_day" placeholder="14th / 1st"></label>
+    <label>Due day <input name="due_dom" value="1" size="3"></label>
     <label>Category <input name="category"></label>
-    <label>Where to pay <input name="where_to_pay"></label>
-    <label>Check
-      <select name="assignment">
-        {% for c in checks %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
+    <label>Where <input name="where_to_pay"></label>
+    <label>Responsible
+      <select name="responsible_earner_id">
+        <option value="">joint</option>
+        {% for e in earners %}<option value="{{ e.id }}">{{ e.name }}</option>{% endfor %}
       </select>
     </label>
+    <label>Funding
+      <select name="funding_mode">
+        <option value="auto">auto</option>
+        <option value="manual">manual</option>
+      </select>
+    </label>
+    <label>Manual source
+      <select name="funding_source_id">
+        <option value="">—</option>
+        {% for s in sources %}{% if s.kind != 'reimbursement' %}<option value="{{ s.id }}">{{ s.name }}</option>{% endif %}{% endfor %}
+      </select>
+    </label>
+    <label>Check # <input name="funding_occurrence" placeholder="1" size="3"></label>
     <label class="chk">Autopay <input type="checkbox" name="autopay" value="1"></label>
     <button class="btn" type="submit">+ Add bill</button>
   </form>
 
   <table class="tbl">
-    <thead><tr><th>BILL</th><th>CHECK</th><th>DUE</th><th>WHERE</th><th class="r">AMOUNT</th><th></th></tr></thead>
+    <thead><tr><th>BILL</th><th>DUE</th><th>WHO</th><th>FUNDING</th><th class="r">AMOUNT</th><th></th></tr></thead>
     <tbody>
       {% for b in bills %}
       <tr>
         <td>{{ b.name }}{% if b.autopay %} <span class="tag">auto</span>{% endif %}</td>
-        <td>{{ b.assignment }}</td>
-        <td class="muted">{{ b.due_day }}</td>
-        <td class="muted">{{ b.where_to_pay }}</td>
+        <td class="muted">{{ b.due_dom }}</td>
+        <td class="muted">{{ (earners | selectattr('id','equalto', b.responsible_earner_id) | map(attribute='name') | first) or 'joint' }}</td>
+        <td class="muted">{{ b.funding_mode }}{% if b.funding_mode == 'manual' and b.funding_occurrence %} #{{ b.funding_occurrence }}{% endif %}</td>
         <td class="r">{{ fmt(b.amount_cents) }}</td>
-        <td class="r">
-          <form method="post" action="{{ base }}/manage/bills/{{ b.id }}/delete"
-                onsubmit="return confirm('Delete {{ b.name }}?')">
-            <button class="btn-x" type="submit">✕</button>
-          </form>
-        </td>
+        <td class="r"><form method="post" action="{{ base }}/manage/bills/{{ b.id }}/delete"
+              onsubmit="return confirm('Delete {{ b.name }}?')"><button class="btn-x" type="submit">✕</button></form></td>
       </tr>
       {% else %}
-      <tr><td colspan="6" class="muted">no bills yet</td></tr>
+      <tr><td colspan="6" class="muted">no bills yet 😊</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -66,39 +138,42 @@
 
 <!-- DEBTS -->
 <section class="panel" id="debts">
-  <div class="panel-head">&gt;&gt; DEBTS (SNOWBALL)</div>
+  <div class="panel-head" data-emoji="⛄">&gt;&gt; DEBTS (SNOWBALL)</div>
   <p class="hint">Roll order sets snowball priority (1 = pay off first). Lowest balance wins ties.</p>
   <form class="form row" method="post" action="{{ base }}/manage/debts/add">
     <label>Name <input name="name" required></label>
     <label>Balance <input name="balance" value="0.00"></label>
     <label>Min payment <input name="min_payment" value="0.00"></label>
     <label>APR % <input name="apr" value="0"></label>
-    <label>Roll order <input name="roll_order" value="0"></label>
+    <label>Roll order <input name="roll_order" value="0" size="3"></label>
     <button class="btn" type="submit">+ Add debt</button>
   </form>
-
   <table class="tbl">
     <thead><tr><th>#</th><th>DEBT</th><th class="r">BALANCE</th><th class="r">MIN</th><th class="r">APR</th><th></th></tr></thead>
     <tbody>
       {% for d in debts %}
       <tr>
-        <td class="muted">{{ d.roll_order }}</td>
-        <td>{{ d.name }}</td>
-        <td class="r">{{ fmt(d.balance_cents) }}</td>
-        <td class="r">{{ fmt(d.min_payment_cents) }}</td>
+        <td class="muted">{{ d.roll_order }}</td><td>{{ d.name }}</td>
+        <td class="r">{{ fmt(d.balance_cents) }}</td><td class="r">{{ fmt(d.min_payment_cents) }}</td>
         <td class="r muted">{{ '%.1f'|format(d.apr) }}%</td>
-        <td class="r">
-          <form method="post" action="{{ base }}/manage/debts/{{ d.id }}/delete"
-                onsubmit="return confirm('Delete {{ d.name }}?')">
-            <button class="btn-x" type="submit">✕</button>
-          </form>
-        </td>
+        <td class="r"><form method="post" action="{{ base }}/manage/debts/{{ d.id }}/delete"
+              onsubmit="return confirm('Delete {{ d.name }}?')"><button class="btn-x" type="submit">✕</button></form></td>
       </tr>
       {% else %}
       <tr><td colspan="6" class="muted">no debts yet</td></tr>
       {% endfor %}
     </tbody>
   </table>
+</section>
+
+<!-- SETTINGS -->
+<section class="panel" id="settings">
+  <div class="panel-head" data-emoji="⚙️">&gt;&gt; SETTINGS</div>
+  <form class="form row" method="post" action="{{ base }}/manage/settings/save">
+    <label>Timezone <input name="timezone" value="{{ tz_name }}" placeholder="America/Chicago"></label>
+    <button class="btn" type="submit">Save</button>
+    <span class="hint">Sets the current month &amp; the clock. e.g. America/Chicago (CT), America/New_York (ET).</span>
+  </form>
 </section>
 
 {% endblock %}

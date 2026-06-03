@@ -1,8 +1,21 @@
-"""Envelope math, debt snowball projection, dashboard rollups."""
+"""Pay-date engine, hybrid bill funding, per-month view (with retained actuals),
+debt snowball, and timezone-aware "now".
+"""
+import calendar
+from datetime import date, datetime, timedelta
+
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:  # pragma: no cover
+    ZoneInfo = None
+
 from . import db
 
-CHECKS = ["14th", "28th"]
+MONTH_NAMES = ["", "January", "February", "March", "April", "May", "June",
+               "July", "August", "September", "October", "November", "December"]
 
+
+# ---- formatting ----------------------------------------------------------
 
 def dollars(cents):
     return cents / 100.0
@@ -14,39 +27,257 @@ def fmt(cents):
     return f"-{s}" if neg else s
 
 
-def envelope_summary():
-    """Per-check available, assigned, remaining + monthly rollup."""
-    paychecks = {p["label"]: p for p in db.query("SELECT * FROM paychecks")}
+# ---- timezone / current period ------------------------------------------
+
+def get_tz():
+    name = db.get_setting("timezone", "America/Chicago")
+    if ZoneInfo is None:
+        return None
+    try:
+        return ZoneInfo(name)
+    except Exception:
+        return ZoneInfo("America/Chicago")
+
+
+def now_ct():
+    tz = get_tz()
+    return datetime.now(tz) if tz else datetime.now()
+
+
+def current_period():
+    n = now_ct()
+    return n.year, n.month
+
+
+def month_label(year, month):
+    return f"{MONTH_NAMES[month]} {year}"
+
+
+def shift_month(year, month, delta):
+    idx = (year * 12 + (month - 1)) + delta
+    return idx // 12, idx % 12 + 1
+
+
+# ---- pay-date generation -------------------------------------------------
+
+def _last_day(year, month):
+    return calendar.monthrange(year, month)[1]
+
+
+def _dom(year, month, day):
+    """Day-of-month clamped; 0 or >last => last day of month."""
+    last = _last_day(year, month)
+    if not day or day > last:
+        return date(year, month, last)
+    return date(year, month, max(1, day))
+
+
+def source_dates(source, year, month):
+    """All dates this source pays within the given month."""
+    freq = source["frequency"]
+    som = date(year, month, 1)
+    eom = date(year, month, _last_day(year, month))
+    out = []
+
+    if freq in ("biweekly", "weekly"):
+        step = 14 if freq == "biweekly" else 7
+        if not source["anchor_date"]:
+            return out
+        try:
+            anchor = date.fromisoformat(source["anchor_date"])
+        except ValueError:
+            return out
+        offset = (som - anchor).days
+        d = anchor + timedelta(days=step * (offset // step))
+        while d < som:
+            d += timedelta(days=step)
+        while d <= eom:
+            out.append(d)
+            d += timedelta(days=step)
+
+    elif freq == "semimonthly":
+        out.append(_dom(year, month, source["day1"]))
+        d2 = _dom(year, month, source["day2"])
+        if d2 not in out:
+            out.append(d2)
+
+    elif freq == "monthly":
+        out.append(_dom(year, month, source["day1"]))
+
+    elif freq == "annual":
+        if source["month"] == month:
+            out.append(_dom(year, month, source["day1"]))
+
+    elif freq == "one_time":
+        try:
+            d = date.fromisoformat(source["anchor_date"])
+            if d.year == year and d.month == month:
+                out.append(d)
+        except (ValueError, TypeError):
+            pass
+
+    return sorted(out)
+
+
+def month_paychecks(year, month):
+    """Occurrences across all active sources in the month, with reimbursements
+    folded onto each earner's first payroll check. is_extra = 3rd+ biweekly check."""
+    sources = db.query("SELECT * FROM income_sources WHERE active=1")
+    earners = {e["id"]: e for e in db.query("SELECT * FROM earners")}
+    reimbs = [s for s in sources if s["kind"] == "reimbursement"]
+    paychecks = [s for s in sources if s["kind"] != "reimbursement"]
+
+    occs = []
+    for s in paychecks:
+        dates = source_dates(s, year, month)
+        for i, d in enumerate(dates, start=1):
+            e = earners.get(s["earner_id"], {})
+            occs.append({
+                "key": f"{s['id']}-{i}",
+                "source_id": s["id"],
+                "source_name": s["name"],
+                "kind": s["kind"],
+                "earner_id": s["earner_id"],
+                "earner_name": e.get("name", "?"),
+                "color": e.get("color", "#888"),
+                "occurrence": i,
+                "date": d,
+                "base_cents": s["amount_cents"],
+                "reimb_cents": 0,
+                "reimb_name": "",
+                "is_extra": s["frequency"] == "biweekly" and i >= 3,
+            })
+
+    # attach each reimbursement to its earner's first payroll check of the month
+    for r in reimbs:
+        cand = sorted([o for o in occs if o["earner_id"] == r["earner_id"]
+                       and o["kind"] == "payroll"], key=lambda o: o["date"])
+        if cand:
+            cand[0]["reimb_cents"] += r["amount_cents"]
+            cand[0]["reimb_name"] = r["name"]
+
+    # apply recorded actuals (override the estimate for that specific check)
+    actuals = {(a["source_id"], a["occurrence"]): a
+               for a in db.query("SELECT * FROM paycheck_actuals WHERE year=? AND month=?",
+                                 (year, month))}
+    for o in occs:
+        a = actuals.get((o["source_id"], o["occurrence"]))
+        if a:
+            o["base_cents"] = a["amount_cents"]
+            o["reimb_cents"] = a["motus_cents"]
+            o["is_actual"] = True
+        else:
+            o["is_actual"] = False
+        o["amount_cents"] = o["base_cents"] + o["reimb_cents"]
+
+    occs.sort(key=lambda o: (o["date"], o["earner_name"]))
+    return occs
+
+
+def _find_occ(occs, source_id, occurrence):
+    for o in occs:
+        if o["source_id"] == source_id and o["occurrence"] == occurrence:
+            return o
+    return None
+
+
+def assign_bills(occs, year, month):
+    """Hybrid funding. Returns dict occ_key -> [bills] and a list of unassigned bills."""
     bills = db.query("SELECT * FROM bills")
-    out = {}
-    for check in CHECKS:
-        p = paychecks.get(check)
-        available = 0
-        if p:
-            available = p["net_cents"] + p["motus_cents"] + p["other_cents"]
-        assigned = sum(b["amount_cents"] for b in bills if b["assignment"] == check)
-        out[check] = {
-            "available": available,
-            "assigned": assigned,
-            "remaining": available - assigned,
-            "bills": [b for b in bills if b["assignment"] == check],
-        }
-    monthly_available = sum(v["available"] for v in out.values())
-    monthly_bills = sum(b["amount_cents"] for b in bills)
-    out["monthly"] = {
-        "available": monthly_available,
-        "assigned": monthly_bills,
-        "remaining": monthly_available - monthly_bills,
+    payments = {p["bill_id"]: p for p in
+                db.query("SELECT * FROM bill_payments WHERE year=? AND month=?", (year, month))}
+    by_occ = {o["key"]: [] for o in occs}
+    unassigned = []
+
+    for b in bills:
+        pay = payments.get(b["id"])
+        # per-month manual override beats template
+        src = pay["funding_source_id"] if pay and pay["funding_source_id"] else b["funding_source_id"]
+        occn = pay["funding_occurrence"] if pay and pay["funding_occurrence"] else b["funding_occurrence"]
+        mode = b["funding_mode"]
+        b = dict(b)
+        b["paid"] = bool(pay["paid"]) if pay else False
+        b["paid_cents"] = pay["paid_cents"] if pay else 0
+
+        target = None
+        if (mode == "manual" or (pay and pay["funding_source_id"])) and src and occn:
+            target = _find_occ(occs, src, occn)
+
+        if target is None:  # auto
+            pool = [o for o in occs if not o["is_extra"]]
+            if b["responsible_earner_id"]:
+                owned = [o for o in pool if o["earner_id"] == b["responsible_earner_id"]]
+                pool = owned or pool
+            before = [o for o in pool if o["date"].day <= (b["due_dom"] or 31)]
+            if before:
+                target = max(before, key=lambda o: o["date"])
+            elif pool:
+                target = min(pool, key=lambda o: o["date"])
+
+        if target is not None:
+            by_occ[target["key"]].append(b)
+        else:
+            unassigned.append(b)
+
+    return by_occ, unassigned
+
+
+def month_view(year, month):
+    occs = month_paychecks(year, month)
+    by_occ, unassigned = assign_bills(occs, year, month)
+
+    rows = []
+    total_in = total_bills = 0
+    for o in occs:
+        funded = by_occ.get(o["key"], [])
+        assigned = sum(x["amount_cents"] for x in funded)
+        total_in += o["amount_cents"]
+        total_bills += assigned
+        rows.append({**o, "bills": funded, "assigned": assigned,
+                     "remaining": o["amount_cents"] - assigned})
+
+    return {
+        "year": year, "month": month, "label": month_label(year, month),
+        "paychecks": rows,
+        "unassigned": unassigned,
+        "extras": [r for r in rows if r["is_extra"]],
+        "total_in": total_in,
+        "total_bills": total_bills,
+        "remaining": total_in - total_bills,
     }
+
+
+def three_check_months(year):
+    src = db.query("SELECT * FROM income_sources WHERE active=1 AND frequency='biweekly'")
+    out = []
+    for m in range(1, 13):
+        if any(len(source_dates(s, year, m)) >= 3 for s in src):
+            out.append(m)
     return out
 
+
+def source_preview(source, count=6):
+    """Next `count` pay dates from today for a source (for the Manage preview)."""
+    today = now_ct().date()
+    dates = []
+    y, m = today.year, today.month
+    guard = 0
+    while len(dates) < count and guard < 36:
+        for d in source_dates(source, y, m):
+            if d >= today:
+                dates.append(d)
+        y, m = shift_month(y, m, 1)
+        guard += 1
+    return dates[:count]
+
+
+# ---- debts (unchanged logic) --------------------------------------------
 
 def total_debt():
     return sum(d["balance_cents"] for d in db.query("SELECT * FROM debts"))
 
 
 def snowball_order():
-    """Debts ordered by roll_order, then smallest balance first."""
     debts = db.query("SELECT * FROM debts WHERE balance_cents > 0")
     return sorted(debts, key=lambda d: (d["roll_order"], d["balance_cents"]))
 
@@ -57,29 +288,23 @@ def next_target():
 
 
 def snowball_projection(extra_cents=0, max_months=120):
-    """Simulate snowball payoff. Returns (months, [remaining_cents per month])."""
-    debts = [
-        {"bal": d["balance_cents"], "min": d["min_payment_cents"], "apr": d["apr"]}
-        for d in snowball_order()
-    ]
+    debts = [{"bal": d["balance_cents"], "min": d["min_payment_cents"], "apr": d["apr"]}
+             for d in snowball_order()]
     if not debts:
         return 0, []
     pool = sum(d["min"] for d in debts) + extra_cents
     points = [sum(d["bal"] for d in debts)]
     for _ in range(max_months):
-        # accrue monthly interest
         for d in debts:
             if d["bal"] > 0:
                 d["bal"] += round(d["bal"] * (d["apr"] / 100.0) / 12.0)
         budget = pool
-        # pay minimums first
         for d in debts:
             if d["bal"] <= 0:
                 continue
             pay = min(d["min"], d["bal"], budget)
             d["bal"] -= pay
             budget -= pay
-        # snowball remainder onto first unpaid debt
         for d in debts:
             if budget <= 0:
                 break
@@ -95,8 +320,16 @@ def snowball_projection(extra_cents=0, max_months=120):
     return max_months, points
 
 
+def snapshot_debts(year, month):
+    """Record current debt balances for this month (history for payoff trend)."""
+    for d in db.query("SELECT * FROM debts"):
+        db.execute(
+            "INSERT INTO debt_snapshots (year, month, debt_id, balance_cents) VALUES (?,?,?,?) "
+            "ON CONFLICT(year, month, debt_id) DO UPDATE SET balance_cents=excluded.balance_cents",
+            (year, month, d["id"], d["balance_cents"]))
+
+
 def svg_area_chart(points, width=900, height=240, pad=4):
-    """Build an SVG area+line chart path from a list of cents values."""
     if not points or len(points) < 2:
         return {"line": "", "area": "", "width": width, "height": height,
                 "lo": 0, "hi": 0, "n": len(points)}

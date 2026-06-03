@@ -196,3 +196,93 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
   color: var(--neg); border-radius: 8px; padding: 2px 8px; font: inherit;
 }
 .btn-x:hover { border-color: var(--neg); }
+.btn-sm {
+  font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; color: var(--bg);
+  background: var(--accent); border: none; border-radius: var(--card-radius);
+  padding: 5px 12px; text-transform: var(--upper); letter-spacing: var(--tracking);
+}
+[data-theme="dark"] .btn-sm { color: #05080a; }
+.btn-sm:hover { filter: brightness(1.08); }
+input[type="color"] { padding: 2px; min-width: 48px; height: 36px; }
+
+/* ---------- clock bar ---------- */
+.clockbar {
+  max-width: var(--maxw); margin: 0 auto; padding: 2px 20px 0;
+  display: flex; gap: 10px; align-items: baseline; color: var(--muted); font-size: 12px;
+}
+.clock { color: var(--text); opacity: 0.85; }
+.clock-tz { text-transform: var(--upper); letter-spacing: var(--tracking); }
+
+/* ---------- month nav ---------- */
+.monthnav {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; margin: 6px 0 18px;
+}
+.monthtitle {
+  font-size: 20px; font-weight: 800; color: var(--accent); text-shadow: var(--glow);
+  text-transform: var(--upper); letter-spacing: var(--tracking); text-align: center;
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: center;
+}
+.navbtn {
+  color: var(--text); text-decoration: none; font-weight: 700; padding: 8px 14px;
+  border: 1px solid var(--border); border-radius: var(--card-radius); background: var(--panel-2);
+  text-transform: var(--upper); letter-spacing: var(--tracking); box-shadow: var(--shadow);
+}
+.navbtn:hover { border-color: var(--accent); }
+.tag.now { background: var(--border-soft); color: var(--pos); }
+.tag.extra { background: var(--border-soft); color: var(--accent); }
+
+/* ---------- paycheck cards ---------- */
+.checks { display: grid; gap: var(--gap); grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+.check { margin-bottom: 0; }
+.check.is-extra { border-style: dashed; }
+.check-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.check-earner { font-weight: 800; text-transform: var(--upper); letter-spacing: var(--tracking); }
+.check-date { color: var(--muted); margin-left: 6px; }
+.check-amt { font-weight: 800; }
+.check-sub { color: var(--muted); font-size: 13px; margin: 4px 0 8px; }
+.extra-note {
+  font-size: 13px; color: var(--accent); background: var(--border-soft);
+  border-radius: var(--card-radius); padding: 8px 10px; margin-bottom: 8px;
+}
+.actual {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border-soft);
+}
+.actual-label { color: var(--muted); font-size: 12px; text-transform: var(--upper); letter-spacing: var(--tracking); }
+.actual input { min-width: 0; }
+
+/* ---------- income source editor ---------- */
+.src { border-top: 1px solid var(--border-soft); padding-top: 12px; margin-top: 12px; }
+.src-grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
+.src-foot { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.src-foot .spacer { flex: 1; }
+.preview { color: var(--muted); font-size: 13px; }
+.preview code {
+  background: var(--panel-2); border: 1px solid var(--border-soft);
+  border-radius: 6px; padding: 1px 6px; margin: 0 3px; color: var(--text);
+}
+.addrow { border-top: 1px dashed var(--border); padding-top: 14px; margin-top: 14px; }
+
+/* ============================================================
+   BUBBLY (light) only — emoji + playful motion. Terminal stays clean.
+   ============================================================ */
+[data-theme="light"] .panel-head[data-emoji]::before { content: attr(data-emoji) " "; }
+[data-theme="light"] .brand::after { content: " ✨"; }
+[data-theme="light"] .nav a[href$="/"]::before,
+[data-theme="light"] .nav a[href$="manage"]::before { content: ""; }
+[data-theme="light"] .btn::after { content: " 💖"; }
+[data-theme="light"] .btn-sm::after { content: " ✅"; }
+[data-theme="light"] .navbtn:hover { transform: scale(1.04); }
+[data-theme="light"] .card { transition: transform 0.15s ease; }
+[data-theme="light"] .card:hover { transform: translateY(-3px) rotate(-0.4deg); }
+[data-theme="light"] .check:hover { transform: translateY(-2px); transition: transform 0.15s ease; }
+
+@keyframes wiggle {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(1.5deg); }
+  75% { transform: rotate(-1.5deg); }
+}
+[data-theme="light"] .btn:hover, [data-theme="light"] .btn-sm:hover { animation: wiggle 0.4s ease; }
+[data-theme="light"] .monthtitle::before { content: "🗓️ "; }
+[data-theme="light"] .empty::after { content: " 🌸"; }

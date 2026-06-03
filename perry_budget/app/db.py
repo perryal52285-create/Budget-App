@@ -1,4 +1,9 @@
-"""SQLite persistence for Perry Budget. Money stored as integer cents."""
+"""SQLite persistence for Perry Budget. Money stored as integer cents.
+
+Definitions (earners, income_sources, bills, debts) are the recurring TEMPLATE.
+Per-month actuals (paycheck_actuals, bill_payments, debt_snapshots) retain history,
+so editing the template never rewrites the past.
+"""
 import os
 import sqlite3
 from contextlib import contextmanager
@@ -7,24 +12,47 @@ DATA_DIR = os.environ.get("DATA_DIR", os.path.join(os.path.dirname(__file__), ".
 DB_PATH = os.path.join(DATA_DIR, "perry_budget.db")
 
 SCHEMA = """
-CREATE TABLE IF NOT EXISTS paychecks (
+CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT
+);
+
+CREATE TABLE IF NOT EXISTS earners (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    label TEXT NOT NULL,              -- "14th" or "28th"
-    net_cents INTEGER NOT NULL DEFAULT 0,
-    motus_cents INTEGER NOT NULL DEFAULT 0,
-    other_cents INTEGER NOT NULL DEFAULT 0,
+    name TEXT NOT NULL,
+    color TEXT DEFAULT '#e3b341',
+    is_primary INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS income_sources (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    earner_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    kind TEXT NOT NULL DEFAULT 'payroll',      -- payroll|reimbursement|bonus_annual|one_time|other
+    amount_cents INTEGER NOT NULL DEFAULT 0,
+    frequency TEXT NOT NULL DEFAULT 'biweekly', -- weekly|biweekly|semimonthly|monthly|annual|one_time
+    anchor_date TEXT DEFAULT '',                -- ISO date for weekly/biweekly/one_time
+    day1 INTEGER NOT NULL DEFAULT 1,            -- semimonthly/monthly/annual day (0 = last day)
+    day2 INTEGER NOT NULL DEFAULT 0,            -- semimonthly second day (0 = last day)
+    month INTEGER NOT NULL DEFAULT 1,           -- annual month
+    active INTEGER NOT NULL DEFAULT 1,
     notes TEXT DEFAULT ''
 );
+
 CREATE TABLE IF NOT EXISTS bills (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     amount_cents INTEGER NOT NULL DEFAULT 0,
-    due_day TEXT DEFAULT '',
+    due_dom INTEGER NOT NULL DEFAULT 1,         -- day of month due
     category TEXT DEFAULT '',
     autopay INTEGER NOT NULL DEFAULT 0,
     where_to_pay TEXT DEFAULT '',
-    assignment TEXT NOT NULL DEFAULT '14th'  -- "14th" | "28th"
+    responsible_earner_id INTEGER DEFAULT NULL, -- NULL = joint
+    funding_mode TEXT NOT NULL DEFAULT 'auto',  -- auto|manual
+    funding_source_id INTEGER DEFAULT NULL,
+    funding_occurrence INTEGER DEFAULT NULL
 );
+
 CREATE TABLE IF NOT EXISTS debts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
@@ -33,12 +61,47 @@ CREATE TABLE IF NOT EXISTS debts (
     apr REAL NOT NULL DEFAULT 0.0,
     roll_order INTEGER NOT NULL DEFAULT 0
 );
+
 CREATE TABLE IF NOT EXISTS goals (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     target_cents INTEGER NOT NULL DEFAULT 0,
     current_cents INTEGER NOT NULL DEFAULT 0,
     target_date TEXT DEFAULT ''
+);
+
+CREATE TABLE IF NOT EXISTS paycheck_actuals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    year INTEGER NOT NULL,
+    month INTEGER NOT NULL,
+    source_id INTEGER NOT NULL,
+    occurrence INTEGER NOT NULL,
+    pay_date TEXT DEFAULT '',
+    amount_cents INTEGER NOT NULL DEFAULT 0,
+    motus_cents INTEGER NOT NULL DEFAULT 0,
+    note TEXT DEFAULT '',
+    UNIQUE(year, month, source_id, occurrence)
+);
+
+CREATE TABLE IF NOT EXISTS bill_payments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    year INTEGER NOT NULL,
+    month INTEGER NOT NULL,
+    bill_id INTEGER NOT NULL,
+    paid_cents INTEGER NOT NULL DEFAULT 0,
+    paid INTEGER NOT NULL DEFAULT 0,
+    funding_source_id INTEGER DEFAULT NULL,
+    funding_occurrence INTEGER DEFAULT NULL,
+    UNIQUE(year, month, bill_id)
+);
+
+CREATE TABLE IF NOT EXISTS debt_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    year INTEGER NOT NULL,
+    month INTEGER NOT NULL,
+    debt_id INTEGER NOT NULL,
+    balance_cents INTEGER NOT NULL DEFAULT 0,
+    UNIQUE(year, month, debt_id)
 );
 """
 
@@ -47,6 +110,28 @@ def init_db():
     os.makedirs(DATA_DIR, exist_ok=True)
     with connect() as con:
         con.executescript(SCHEMA)
+    _seed()
+
+
+def _seed():
+    """First-run defaults only (skips if earners already exist)."""
+    if query("SELECT 1 FROM earners LIMIT 1"):
+        return
+    set_setting("timezone", "America/Chicago")
+    alex = execute("INSERT INTO earners (name, color, is_primary) VALUES (?,?,1)", ("Alex", "#46d970"))
+    execute("INSERT INTO earners (name, color, is_primary) VALUES (?,?,0)", ("Rae", "#ff79b0"))
+    execute(
+        "INSERT INTO income_sources (earner_id, name, kind, amount_cents, frequency, anchor_date)"
+        " VALUES (?,?,?,?,?,?)",
+        (alex, "Alex Payroll", "payroll", 0, "biweekly", "2026-06-05"))
+    execute(
+        "INSERT INTO income_sources (earner_id, name, kind, amount_cents, frequency)"
+        " VALUES (?,?,?,?,?)",
+        (alex, "Motus Reimbursement", "reimbursement", 0, "monthly"))
+    execute(
+        "INSERT INTO income_sources (earner_id, name, kind, amount_cents, frequency, month, day1)"
+        " VALUES (?,?,?,?,?,?,?)",
+        (alex, "January Bonus", "bonus_annual", 0, "annual", 1, 15))
 
 
 @contextmanager
@@ -69,3 +154,15 @@ def execute(sql, params=()):
     with connect() as con:
         cur = con.execute(sql, params)
         return cur.lastrowid
+
+
+# ---- settings helpers ----------------------------------------------------
+
+def get_setting(key, default=None):
+    rows = query("SELECT value FROM settings WHERE key=?", (key,))
+    return rows[0]["value"] if rows else default
+
+
+def set_setting(key, value):
+    execute("INSERT INTO settings (key, value) VALUES (?,?) "
+            "ON CONFLICT(key) DO UPDATE SET value=excluded.value", (key, value))
