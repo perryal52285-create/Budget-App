@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block content %}
+
+<section class="panel term-panel">
+  <div class="panel-head" data-emoji="🖥️">&gt;&gt; PERRY//BUDGET TERMINAL</div>
+  <p class="hint">Type <code>help</code> for commands. Read state or change it: <code>show july 2026</code>,
+    <code>add bill rent 1500 due 1</code>, <code>budget groceries 600</code>, <code>spend groceries 84 costco</code>.</p>
+
+  <div id="term" class="term" tabindex="0">
+    <pre id="term-out" class="term-out"></pre>
+    <div class="term-inputline">
+      <span class="term-prompt">{{ prompt }}</span>
+      <input id="term-in" class="term-in" autocomplete="off" autocapitalize="off"
+             spellcheck="false" autofocus>
+    </div>
+  </div>
+</section>
+
+<script>
+(function () {
+  var base = "{{ base }}";
+  var out = document.getElementById("term-out");
+  var input = document.getElementById("term-in");
+  var term = document.getElementById("term");
+  var prompt = {{ prompt|tojson }};
+  var history = [];
+  var hpos = -1;
+
+  function write(text) { out.textContent += text; term.scrollTop = term.scrollHeight; }
+
+  write("Perry Budget terminal. Type 'help'.\n\n");
+
+  function run(line) {
+    write(prompt + " " + line + "\n");
+    var body = new URLSearchParams(); body.set("line", line);
+    fetch(base + "/term/exec", { method: "POST", body: body })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d.output === "\f") { out.textContent = ""; return; }
+        if (d.output) write(d.output + "\n");
+        write("\n");
+      })
+      .catch(function () { write("! connection error\n\n"); });
+  }
+
+  input.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") {
+      var line = input.value.trim();
+      input.value = "";
+      if (line) { history.push(line); hpos = history.length; run(line); }
+    } else if (e.key === "ArrowUp") {
+      if (hpos > 0) { hpos--; input.value = history[hpos]; e.preventDefault(); }
+    } else if (e.key === "ArrowDown") {
+      if (hpos < history.length - 1) { hpos++; input.value = history[hpos]; }
+      else { hpos = history.length; input.value = ""; }
+    }
+  });
+
+  term.addEventListener("click", function () { input.focus(); });
+})();
+</script>
+
+{% endblock %}

@@ -171,10 +171,29 @@
 <!-- SETTINGS -->
 <section class="panel" id="settings">
   <div class="panel-head" data-emoji="⚙️">&gt;&gt; SETTINGS</div>
-  <form class="form row" method="post" action="{{ base }}/manage/settings/save">
-    <label>Timezone <input name="timezone" value="{{ tz_name }}" placeholder="America/Chicago"></label>
-    <button class="btn" type="submit">Save</button>
-    <span class="hint">Sets the current month &amp; the clock. e.g. America/Chicago (CT), America/New_York (ET).</span>
+  <form class="form" method="post" action="{{ base }}/manage/settings/save">
+    <div class="src-grid">
+      <label>Timezone <input name="timezone" value="{{ tz_name }}" placeholder="America/Chicago"></label>
+      <label>Notify service <input name="notify_service" value="{{ notify_service }}" placeholder="notify"></label>
+      <label>Alert days ahead <input name="alert_days_ahead" value="{{ alert_days_ahead }}" size="3"></label>
+      <label class="chk">Export HA sensors <input type="checkbox" name="sensors_enabled" value="1" {{ 'checked' if sensors_enabled }}></label>
+    </div>
+    <div class="src-foot">
+      <span class="hint">
+        Timezone sets the current month &amp; clock (e.g. America/Chicago = CT).
+        <b>Notify service</b> is the HA service used for alerts (e.g. <code>notify</code>,
+        <code>mobile_app_alex_phone</code>). Sensors publish to <code>sensor.perry_budget_*</code>.
+      </span>
+      <span class="spacer"></span>
+      <button class="btn" type="submit">Save</button>
+    </div>
+  </form>
+  <form class="form row" method="post" action="{{ base }}/alerts/test" style="margin-top:12px">
+    <button class="btn" type="submit">Send test alert + push sensors</button>
+    <span class="hint">
+      {% if ha_available %}Home Assistant link detected ✓ — sends a test notification and refreshes sensors now.
+      {% else %}Home Assistant API not detected (you're likely running locally). This works once installed as an add-on.{% endif %}
+    </span>
   </form>
 </section>
 

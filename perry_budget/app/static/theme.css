@@ -264,6 +264,59 @@ input[type="color"] { padding: 2px; min-width: 48px; height: 36px; }
 }
 .addrow { border-top: 1px dashed var(--border); padding-top: 14px; margin-top: 14px; }
 
+/* ---------- alerts ---------- */
+.alerts { display: flex; flex-direction: column; gap: 8px; margin: 0 0 18px; }
+.alert {
+  border: 1px solid var(--border); border-left-width: 4px;
+  border-radius: var(--card-radius); padding: 10px 14px;
+  background: var(--panel); box-shadow: var(--shadow); font-size: 14px;
+}
+.alert-warn { border-left-color: var(--neg); color: var(--neg); }
+.alert-info { border-left-color: var(--accent); color: var(--text); }
+[data-theme="light"] .alert[data-emoji]::before { content: attr(data-emoji) " "; }
+
+/* ---------- budget bars ---------- */
+.budrow { padding: 12px 0; border-bottom: 1px solid var(--border-soft); }
+.budrow-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.budcat { font-weight: 800; text-transform: var(--upper); letter-spacing: var(--tracking); }
+.budnums { font-size: 13px; }
+.budbar {
+  height: 12px; border-radius: 8px; background: var(--border-soft);
+  overflow: hidden; margin: 8px 0; border: 1px solid var(--border-soft);
+}
+.budbar-fill {
+  height: 100%; background: var(--pos); border-radius: 8px;
+  transition: width 0.3s ease; box-shadow: var(--glow);
+}
+.budbar-fill.over { background: var(--neg); }
+.budrow.is-over .budcat { color: var(--neg); }
+.budedit { display: flex; align-items: center; gap: 8px; }
+.budedit input { min-width: 0; }
+
+/* ---------- terminal (TUI) ---------- */
+.term-panel { max-width: 920px; }
+.term {
+  background: #04070a; border: 1px solid var(--border); border-radius: var(--card-radius);
+  padding: 14px 16px; min-height: 420px; max-height: 70vh; overflow-y: auto;
+  font-family: "JetBrains Mono", "SF Mono", "Consolas", ui-monospace, monospace;
+  font-size: 13px; line-height: 1.5; cursor: text;
+}
+[data-theme="light"] .term { background: #2a2140; border-color: #c9b8ff; }
+.term-out { margin: 0; white-space: pre-wrap; word-break: break-word; color: #46d970; }
+[data-theme="light"] .term-out { color: #b6f5cf; }
+.term-inputline { display: flex; align-items: center; gap: 8px; }
+.term-prompt { color: #e3b341; flex: none; }
+.term-in {
+  flex: 1; background: transparent; border: none; outline: none;
+  color: #46d970; font: inherit; padding: 2px 0; min-width: 0;
+}
+[data-theme="light"] .term-in { color: #b6f5cf; }
+.term-in:focus { outline: none; border: none; }
+.term code, .term-panel .hint code {
+  background: var(--panel-2); border: 1px solid var(--border-soft);
+  border-radius: 6px; padding: 1px 6px; color: var(--text);
+}
+
 /* ============================================================
    BUBBLY (light) only — emoji + playful motion. Terminal stays clean.
    ============================================================ */

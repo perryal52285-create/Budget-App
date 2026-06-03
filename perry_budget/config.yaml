@@ -1,7 +1,7 @@
 name: Perry Budget
-version: "0.2.0"
+version: "0.3.0"
 slug: perry_budget
-description: Biweekly pay-date engine, two earners, hybrid bill funding, debt snowball, monthly history. Terminal (dark) + bubbly (light) themes.
+description: Biweekly pay-date engine, two earners, hybrid bill funding, debt snowball, monthly history, category budgets, HA alerts/sensors, and a command-driven web terminal. Terminal (dark) + bubbly (light) themes.
 url: https://github.com/perryal52285-create/Budget-App
 arch:
   - aarch64
@@ -16,5 +16,9 @@ hassio_api: true
 homeassistant_api: true
 map:
   - share:rw
+ports:
+  8099/tcp: 8099
+ports_description:
+  8099/tcp: Perry Budget web UI (standalone, LAN). Leave unset to use HA ingress only.
 options: {}
 schema: {}

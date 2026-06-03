@@ -330,6 +330,125 @@ def snapshot_debts(year, month):
             (year, month, d["id"], d["balance_cents"]))
 
 
+# ---- budgets (category spending caps) -----------------------------------
+
+def category_spend(year, month):
+    """Spent per category this month = recurring bills in that category
+    (the monthly template) + ad-hoc transactions recorded for the month."""
+    spend = {}
+    for b in db.query("SELECT category, amount_cents FROM bills"):
+        cat = (b["category"] or "").strip()
+        if cat:
+            spend[cat] = spend.get(cat, 0) + b["amount_cents"]
+    for t in db.query("SELECT category, amount_cents FROM transactions WHERE year=? AND month=?",
+                      (year, month)):
+        cat = (t["category"] or "").strip()
+        if cat:
+            spend[cat] = spend.get(cat, 0) + t["amount_cents"]
+    return spend
+
+
+def budget_status(year, month):
+    """Per-budget rows with limit, spent, remaining, pct, over flag."""
+    spend = category_spend(year, month)
+    rows = []
+    budgets = db.query("SELECT * FROM budgets ORDER BY category")
+    budgeted = set()
+    for b in budgets:
+        cat = b["category"]
+        budgeted.add(cat)
+        limit = b["monthly_limit_cents"]
+        spent = spend.get(cat, 0)
+        pct = round(spent / limit * 100) if limit else 0
+        rows.append({
+            "id": b["id"], "category": cat, "limit_cents": limit,
+            "spent_cents": spent, "remaining_cents": limit - spent,
+            "pct": pct, "over": spent > limit,
+        })
+    # categories with spend but no budget set yet (informational)
+    untracked = [{"category": c, "spent_cents": v} for c, v in sorted(spend.items())
+                 if c not in budgeted]
+    return rows, untracked
+
+
+# ---- next paycheck / alerts ---------------------------------------------
+
+def next_paycheck(from_date=None):
+    """The soonest upcoming paycheck occurrence on/after from_date (default today)."""
+    today = from_date or now_ct().date()
+    y, m = today.year, today.month
+    guard = 0
+    while guard < 14:
+        for o in sorted(month_paychecks(y, m), key=lambda o: o["date"]):
+            if o["date"] >= today:
+                return o
+        y, m = shift_month(y, m, 1)
+        guard += 1
+    return None
+
+
+def days_to_next_paycheck(from_date=None):
+    today = from_date or now_ct().date()
+    nxt = next_paycheck(today)
+    return (nxt["date"] - today).days if nxt else None
+
+
+def detect_alerts(year, month):
+    """Surface conditions worth a nudge: unfunded bills, over-budget categories,
+    and an imminent paycheck. Returns list of {level, kind, text}."""
+    alerts = []
+    view = month_view(year, month)
+    if view["unassigned"]:
+        total = sum(b["amount_cents"] for b in view["unassigned"])
+        alerts.append({"level": "warn", "kind": "unfunded",
+                       "text": f"{len(view['unassigned'])} unfunded bill(s) totaling {fmt(total)} this month."})
+
+    rows, _ = budget_status(year, month)
+    for r in rows:
+        if r["over"]:
+            alerts.append({"level": "warn", "kind": "budget",
+                           "text": f"Over budget on {r['category']}: {fmt(r['spent_cents'])} of {fmt(r['limit_cents'])}."})
+
+    ahead = int(db.get_setting("alert_days_ahead", "3") or 3)
+    nxt = next_paycheck()
+    if nxt:
+        d = (nxt["date"] - now_ct().date()).days
+        if 0 <= d <= ahead:
+            when = "today" if d == 0 else f"in {d} day(s)"
+            alerts.append({"level": "info", "kind": "paycheck",
+                           "text": f"{nxt['earner_name']} paycheck {when} ({nxt['date'].strftime('%a %b %-d')}, {fmt(nxt['amount_cents'])})."})
+    return alerts
+
+
+def sensor_payload(year, month):
+    """Snapshot of headline numbers for export as Home Assistant sensors."""
+    view = month_view(year, month)
+    months_, _ = snowball_projection()
+    rows, _ = budget_status(year, month)
+    over = sum(1 for r in rows if r["over"])
+    days = days_to_next_paycheck()
+    return {
+        "total_debt": {"state": f"{dollars(total_debt()):.2f}", "unit": "USD",
+                       "name": "Perry Budget Total Debt", "icon": "mdi:credit-card-outline"},
+        "remaining_this_month": {"state": f"{dollars(view['remaining']):.2f}", "unit": "USD",
+                                 "name": "Perry Budget Remaining This Month", "icon": "mdi:wallet"},
+        "income_this_month": {"state": f"{dollars(view['total_in']):.2f}", "unit": "USD",
+                              "name": "Perry Budget Income This Month", "icon": "mdi:cash-plus"},
+        "bills_this_month": {"state": f"{dollars(view['total_bills']):.2f}", "unit": "USD",
+                             "name": "Perry Budget Bills This Month", "icon": "mdi:receipt"},
+        "payoff_months": {"state": str(months_), "unit": "mo",
+                          "name": "Perry Budget Payoff Months", "icon": "mdi:calendar-clock"},
+        "next_target": {"state": next_target() or "none",
+                        "name": "Perry Budget Next Payoff Target", "icon": "mdi:target"},
+        "days_to_paycheck": {"state": "unknown" if days is None else str(days), "unit": "d",
+                             "name": "Perry Budget Days To Paycheck", "icon": "mdi:cash-clock"},
+        "unfunded_bills": {"state": str(len(view["unassigned"])),
+                           "name": "Perry Budget Unfunded Bills", "icon": "mdi:alert-circle-outline"},
+        "over_budget": {"state": str(over),
+                        "name": "Perry Budget Over-Budget Categories", "icon": "mdi:chart-bell-curve"},
+    }
+
+
 def svg_area_chart(points, width=900, height=240, pad=4):
     if not points or len(points) < 2:
         return {"line": "", "area": "", "width": width, "height": height,

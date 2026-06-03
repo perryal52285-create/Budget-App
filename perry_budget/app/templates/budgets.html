@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block content %}
+
+<section class="monthnav">
+  <a class="navbtn" href="{{ base }}/budgets?year={{ prev.year }}&month={{ prev.month }}">‹ {{ month_names[prev.month] }}</a>
+  <div class="monthtitle">{{ label }} · budgets</div>
+  <a class="navbtn" href="{{ base }}/budgets?year={{ next.year }}&month={{ next.month }}">{{ month_names[next.month] }} ›</a>
+</section>
+
+<section class="panel">
+  <div class="panel-head" data-emoji="🎯">&gt;&gt; CATEGORY BUDGETS</div>
+  <p class="hint">Spent = recurring bills in that category + ad-hoc spending logged below. Bars turn red when you go over.</p>
+  {% for r in rows %}
+  <div class="budrow {{ 'is-over' if r.over }}">
+    <div class="budrow-top">
+      <span class="budcat">{{ r.category }}</span>
+      <span class="budnums {{ 'neg' if r.over else '' }}">{{ fmt(r.spent_cents) }} / {{ fmt(r.limit_cents) }}
+        <span class="muted">({{ fmt(r.remaining_cents) }} left)</span></span>
+    </div>
+    <div class="budbar"><div class="budbar-fill {{ 'over' if r.over }}" style="width: {{ [r.pct, 100]|min }}%"></div></div>
+    <form class="budedit" method="post" action="{{ base }}/manage/budgets/save">
+      <input type="hidden" name="category" value="{{ r.category }}">
+      <input name="amount" value="{{ '%.2f'|format(r.limit_cents/100) }}" size="8">
+      <button class="btn-sm" type="submit">set</button>
+      <button class="btn-x" type="submit" formaction="{{ base }}/manage/budgets/{{ r.id }}/delete">✕</button>
+    </form>
+  </div>
+  {% else %}
+  <div class="empty">No budgets yet — add one below.</div>
+  {% endfor %}
+
+  {% if untracked %}
+  <div class="hint" style="margin-top:14px">Spending with no cap set:
+    {% for u in untracked %}<code>{{ u.category }} {{ fmt(u.spent_cents) }}</code> {% endfor %}</div>
+  {% endif %}
+
+  <form class="form row addrow" method="post" action="{{ base }}/manage/budgets/save">
+    <label>Category <input name="category" required placeholder="e.g. Groceries" list="cats"></label>
+    <datalist id="cats">{% for c in categories %}<option value="{{ c.category }}">{% endfor %}</datalist>
+    <label>Monthly cap <input name="amount" value="0.00"></label>
+    <button class="btn" type="submit">+ Set budget</button>
+  </form>
+</section>
+
+<section class="panel">
+  <div class="panel-head" data-emoji="🧾">&gt;&gt; LOG SPENDING — {{ label }}</div>
+  <p class="hint">Record one-off spending (anything beyond your recurring bills) so budgets reflect reality.</p>
+  <form class="form row" method="post" action="{{ base }}/budgets/spend">
+    <input type="hidden" name="year" value="{{ year }}">
+    <input type="hidden" name="month" value="{{ month }}">
+    <label>Category <input name="category" required list="cats"></label>
+    <label>Amount <input name="amount" value="0.00"></label>
+    <label>Note <input name="description" placeholder="optional"></label>
+    <label>Date <input name="txn_date" placeholder="YYYY-MM-DD"></label>
+    <button class="btn" type="submit">+ Log</button>
+  </form>
+
+  <table class="tbl">
+    <thead><tr><th>DATE</th><th>CATEGORY</th><th>NOTE</th><th class="r">AMOUNT</th><th></th></tr></thead>
+    <tbody>
+      {% for t in transactions %}
+      <tr>
+        <td class="muted">{{ t.txn_date or '—' }}</td>
+        <td>{{ t.category }}</td>
+        <td class="muted">{{ t.description }}</td>
+        <td class="r">{{ fmt(t.amount_cents) }}</td>
+        <td class="r"><form method="post" action="{{ base }}/budgets/spend/{{ t.id }}/delete"><button class="btn-x" type="submit">✕</button></form></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="muted">no spending logged this month</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+{% endblock %}

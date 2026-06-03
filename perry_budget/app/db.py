@@ -104,6 +104,23 @@ CREATE TABLE IF NOT EXISTS debt_snapshots (
     balance_cents INTEGER NOT NULL DEFAULT 0,
     UNIQUE(year, month, debt_id)
 );
+
+CREATE TABLE IF NOT EXISTS budgets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    category TEXT NOT NULL,
+    monthly_limit_cents INTEGER NOT NULL DEFAULT 0,
+    UNIQUE(category)
+);
+
+CREATE TABLE IF NOT EXISTS transactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    year INTEGER NOT NULL,
+    month INTEGER NOT NULL,
+    category TEXT DEFAULT '',
+    description TEXT DEFAULT '',
+    amount_cents INTEGER NOT NULL DEFAULT 0,
+    txn_date TEXT DEFAULT ''
+);
 """
 
 

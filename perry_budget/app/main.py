@@ -6,7 +6,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from . import db, budget
+from . import db, budget, ha, tui
 
 BASE = os.path.dirname(__file__)
 app = FastAPI(title="Perry Budget")
@@ -75,6 +75,9 @@ def dashboard(request: Request, year: int = None, month: int = None):
 
     if (year, month) == (cy, cm):
         budget.snapshot_debts(year, month)  # keep current-month debt history fresh
+        # best-effort: keep HA sensors in sync whenever the current month is viewed
+        if db.get_setting("sensors_enabled", "1") == "1":
+            ha.push_sensors(budget.sensor_payload(year, month))
 
     view = budget.month_view(year, month)
     py, pm = budget.shift_month(year, month, -1)
@@ -93,7 +96,98 @@ def dashboard(request: Request, year: int = None, month: int = None):
         next_target=budget.next_target(),
         payoff_months=months_,
         chart=chart,
+        alerts=budget.detect_alerts(year, month),
     ))
+
+
+# ---- budgets -------------------------------------------------------------
+
+@app.get("/budgets")
+def budgets_page(request: Request, year: int = None, month: int = None):
+    cy, cm = budget.current_period()
+    year = year or cy
+    month = month or cm
+    if month < 1 or month > 12:
+        year, month = cy, cm
+    rows, untracked = budget.budget_status(year, month)
+    txns = db.query(
+        "SELECT * FROM transactions WHERE year=? AND month=? ORDER BY id DESC", (year, month))
+    py, pm = budget.shift_month(year, month, -1)
+    ny, nm = budget.shift_month(year, month, 1)
+    return templates.TemplateResponse("budgets.html", ctx(
+        request,
+        year=year, month=month, label=budget.month_label(year, month),
+        rows=rows, untracked=untracked, transactions=txns,
+        prev={"year": py, "month": pm}, next={"year": ny, "month": nm},
+        categories=db.query("SELECT DISTINCT category FROM bills WHERE category != '' ORDER BY category"),
+    ))
+
+
+@app.post("/manage/budgets/save")
+def save_budget(request: Request, category: str = Form(...), amount: str = Form("0")):
+    cat = category.strip()
+    if cat:
+        db.execute(
+            "INSERT INTO budgets (category, monthly_limit_cents) VALUES (?,?) "
+            "ON CONFLICT(category) DO UPDATE SET monthly_limit_cents=excluded.monthly_limit_cents",
+            (cat, _cents(amount)))
+    return RedirectResponse(url=f"{request.headers.get('X-Ingress-Path', '')}/budgets", status_code=303)
+
+
+@app.post("/manage/budgets/{budget_id}/delete")
+def delete_budget(request: Request, budget_id: int):
+    db.execute("DELETE FROM budgets WHERE id=?", (budget_id,))
+    return RedirectResponse(url=f"{request.headers.get('X-Ingress-Path', '')}/budgets", status_code=303)
+
+
+@app.post("/budgets/spend")
+async def add_spend(request: Request):
+    f = await request.form()
+    y, m = _int(f.get("year")) or None, _int(f.get("month")) or None
+    cy, cm = budget.current_period()
+    y, m = y or cy, m or cm
+    db.execute(
+        "INSERT INTO transactions (year, month, category, description, amount_cents, txn_date) "
+        "VALUES (?,?,?,?,?,?)",
+        (y, m, f.get("category", "").strip(), f.get("description", "").strip(),
+         _cents(f.get("amount", 0)), f.get("txn_date", "") or budget.now_ct().date().isoformat()))
+    base = request.headers.get("X-Ingress-Path", "")
+    return RedirectResponse(url=f"{base}/budgets?year={y}&month={m}", status_code=303)
+
+
+@app.post("/budgets/spend/{txn_id}/delete")
+async def delete_spend(request: Request, txn_id: int):
+    db.execute("DELETE FROM transactions WHERE id=?", (txn_id,))
+    return RedirectResponse(url=f"{request.headers.get('X-Ingress-Path', '')}/budgets", status_code=303)
+
+
+# ---- web terminal (TUI) --------------------------------------------------
+
+@app.get("/term")
+def term_page(request: Request):
+    return templates.TemplateResponse("term.html", ctx(request, prompt=tui.PROMPT))
+
+
+@app.post("/term/exec")
+async def term_exec(request: Request):
+    f = await request.form()
+    return {"output": tui.run(f.get("line", ""))}
+
+
+# ---- alerts / sensors test ----------------------------------------------
+
+@app.post("/alerts/test")
+def alerts_test(request: Request):
+    cy, cm = budget.current_period()
+    if db.get_setting("sensors_enabled", "1") == "1":
+        ha.push_sensors(budget.sensor_payload(cy, cm))
+    msg = "Perry Budget test: HA link is working. ✓"
+    al = budget.detect_alerts(cy, cm)
+    if al:
+        msg = "Perry Budget — " + "; ".join(a["text"] for a in al[:3])
+    service = db.get_setting("notify_service", "notify") or "notify"
+    ha.notify(msg, service=service)
+    return back(request, "#settings")
 
 
 # ---- manage --------------------------------------------------------------
@@ -111,6 +205,10 @@ def manage(request: Request):
         debts=db.query("SELECT * FROM debts ORDER BY roll_order, balance_cents"),
         frequencies=["weekly", "biweekly", "semimonthly", "monthly", "annual", "one_time"],
         kinds=["payroll", "reimbursement", "bonus_annual", "one_time", "other"],
+        sensors_enabled=db.get_setting("sensors_enabled", "1") == "1",
+        notify_service=db.get_setting("notify_service", "notify"),
+        alert_days_ahead=db.get_setting("alert_days_ahead", "3"),
+        ha_available=ha.available(),
     ))
 
 
@@ -216,8 +314,12 @@ def delete_debt(request: Request, debt_id: int):
 # ---- settings ------------------------------------------------------------
 
 @app.post("/manage/settings/save")
-def save_settings(request: Request, timezone: str = Form("America/Chicago")):
-    db.set_setting("timezone", timezone.strip() or "America/Chicago")
+async def save_settings(request: Request):
+    f = await request.form()
+    db.set_setting("timezone", (f.get("timezone", "") or "America/Chicago").strip() or "America/Chicago")
+    db.set_setting("sensors_enabled", "1" if f.get("sensors_enabled") else "0")
+    db.set_setting("notify_service", (f.get("notify_service", "") or "notify").strip() or "notify")
+    db.set_setting("alert_days_ahead", str(_int(f.get("alert_days_ahead"), 3)))
     return back(request, "#settings")
 
 
