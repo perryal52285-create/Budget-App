@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS income_sources (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     earner_id INTEGER NOT NULL,
     name TEXT NOT NULL,
+    employer TEXT DEFAULT '',                   -- employer / payer name
     kind TEXT NOT NULL DEFAULT 'payroll',      -- payroll|reimbursement|bonus_annual|one_time|other
     amount_cents INTEGER NOT NULL DEFAULT 0,
     frequency TEXT NOT NULL DEFAULT 'biweekly', -- weekly|biweekly|semimonthly|monthly|annual|one_time
@@ -110,7 +111,24 @@ def init_db():
     os.makedirs(DATA_DIR, exist_ok=True)
     with connect() as con:
         con.executescript(SCHEMA)
+    _migrate()
     _seed()
+
+
+# Additive schema migrations: (table, column, column-def). CREATE TABLE IF NOT
+# EXISTS never alters an existing table, so new columns are added here so HA
+# databases that persist across rebuilds pick them up.
+_MIGRATIONS = [
+    ("income_sources", "employer", "TEXT DEFAULT ''"),
+]
+
+
+def _migrate():
+    with connect() as con:
+        for table, column, coldef in _MIGRATIONS:
+            cols = [r["name"] for r in con.execute(f"PRAGMA table_info({table})").fetchall()]
+            if column not in cols:
+                con.execute(f"ALTER TABLE {table} ADD COLUMN {column} {coldef}")
 
 
 def _seed():

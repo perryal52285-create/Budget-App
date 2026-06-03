@@ -136,6 +136,7 @@ def month_paychecks(year, month):
                 "key": f"{s['id']}-{i}",
                 "source_id": s["id"],
                 "source_name": s["name"],
+                "employer": s.get("employer", ""),
                 "kind": s["kind"],
                 "earner_id": s["earner_id"],
                 "earner_name": e.get("name", "?"),

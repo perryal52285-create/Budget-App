@@ -65,7 +65,7 @@
       <div class="check-amt {{ 'neg' if p.remaining < 0 else 'pos' }}">{{ fmt(p.remaining) }} left</div>
     </div>
     <div class="check-sub">
-      {{ p.source_name }} · in {{ fmt(p.amount_cents) }}
+      {{ p.source_name }}{% if p.employer %} · {{ p.employer }}{% endif %} · in {{ fmt(p.amount_cents) }}
       {% if p.reimb_cents %}<span class="muted">(+{{ fmt(p.reimb_cents) }} {{ p.reimb_name }})</span>{% endif %}
     </div>
 

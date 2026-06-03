@@ -35,6 +35,7 @@
   <form class="form src" method="post" action="{{ base }}/manage/income/{{ s.id }}/update">
     <div class="src-grid">
       <label>Name <input name="name" value="{{ s.name }}"></label>
+      <label>Employer <input name="employer" value="{{ s.employer or '' }}"></label>
       <label>Earner
         <select name="earner_id">
           {% for e in earners %}<option value="{{ e.id }}" {{ 'selected' if e.id == s.earner_id }}>{{ e.name }}</option>{% endfor %}
@@ -67,6 +68,7 @@
 
   <form class="form row addrow" method="post" action="{{ base }}/manage/income/add">
     <label>New source <input name="name" required placeholder="e.g. Rae Payroll"></label>
+    <label>Employer <input name="employer" placeholder="employer"></label>
     <label>Earner
       <select name="earner_id">{% for e in earners %}<option value="{{ e.id }}">{{ e.name }}</option>{% endfor %}</select>
     </label>

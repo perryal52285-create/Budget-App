@@ -138,10 +138,11 @@ def delete_earner(request: Request, earner_id: int):
 
 def _income_fields(form):
     return (
-        _int(form.get("earner_id")), form.get("name", ""), form.get("kind", "payroll"),
-        _cents(form.get("amount", 0)), form.get("frequency", "biweekly"),
-        form.get("anchor_date", ""), _int(form.get("day1"), 1), _int(form.get("day2"), 0),
-        _int(form.get("month"), 1), 1 if form.get("active", "1") else 0, form.get("notes", ""),
+        _int(form.get("earner_id")), form.get("name", ""), form.get("employer", ""),
+        form.get("kind", "payroll"), _cents(form.get("amount", 0)),
+        form.get("frequency", "biweekly"), form.get("anchor_date", ""),
+        _int(form.get("day1"), 1), _int(form.get("day2"), 0), _int(form.get("month"), 1),
+        1 if form.get("active", "1") else 0, form.get("notes", ""),
     )
 
 
@@ -149,8 +150,9 @@ def _income_fields(form):
 async def add_income(request: Request):
     f = await request.form()
     db.execute(
-        "INSERT INTO income_sources (earner_id, name, kind, amount_cents, frequency, anchor_date,"
-        " day1, day2, month, active, notes) VALUES (?,?,?,?,?,?,?,?,?,?,?)", _income_fields(f))
+        "INSERT INTO income_sources (earner_id, name, employer, kind, amount_cents, frequency,"
+        " anchor_date, day1, day2, month, active, notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+        _income_fields(f))
     return back(request, "#income")
 
 
@@ -159,8 +161,8 @@ async def update_income(request: Request, source_id: int):
     f = await request.form()
     vals = _income_fields(f) + (source_id,)
     db.execute(
-        "UPDATE income_sources SET earner_id=?, name=?, kind=?, amount_cents=?, frequency=?,"
-        " anchor_date=?, day1=?, day2=?, month=?, active=?, notes=? WHERE id=?", vals)
+        "UPDATE income_sources SET earner_id=?, name=?, employer=?, kind=?, amount_cents=?,"
+        " frequency=?, anchor_date=?, day1=?, day2=?, month=?, active=?, notes=? WHERE id=?", vals)
     return back(request, "#income")
 
 
