@@ -1,11 +1,49 @@
-:root {
-  color-scheme: light dark;
-  --bg: #0b0f0c;
-  --fg: #46d970;
-  --muted: #6f8f78;
-  --card: #11171300;
-  --accent: #46d970;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+@import "tailwindcss";
+
+/* ============================================================
+   Perry Budget design system — two themes via [data-theme].
+   terminal = Alex (dark, phosphor, mono). bubbly = Rae (pastel, rounded).
+   Components consume CSS vars so a single attribute swap re-skins everything.
+   ============================================================ */
+
+[data-theme="terminal"] {
+  --bg: #0a0e0b;
+  --bg-grad: radial-gradient(1200px 600px at 80% -10%, #0f1c14 0%, #0a0e0b 60%);
+  --surface: #0e1411;
+  --surface-2: #121a15;
+  --border: #1e2c24;
+  --text: #d7ffe6;
+  --text-dim: #6f9a82;
+  --primary: #46d970;
+  --primary-soft: #163d27;
+  --on-primary: #04140b;
+  --danger: #ff5b5b;
+  --warn: #e3b341;
+  --info: #5b9bff;
+  --radius: 10px;
+  --radius-lg: 14px;
+  --font: ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, Consolas, monospace;
+  --shadow: 0 1px 0 rgba(70, 217, 112, 0.08), 0 8px 30px rgba(0, 0, 0, 0.45);
+}
+
+[data-theme="bubbly"] {
+  --bg: #fff6fb;
+  --bg-grad: radial-gradient(1100px 500px at 85% -10%, #ffe9f4 0%, #fff6fb 55%);
+  --surface: #ffffff;
+  --surface-2: #fff0f8;
+  --border: #ffd6ea;
+  --text: #43303b;
+  --text-dim: #a8869a;
+  --primary: #ff79b0;
+  --primary-soft: #ffe3f0;
+  --on-primary: #ffffff;
+  --danger: #ff5b7a;
+  --warn: #f0a400;
+  --info: #6aa6ff;
+  --radius: 16px;
+  --radius-lg: 22px;
+  --font: "Nunito", ui-rounded, "SF Pro Rounded", "Segoe UI", system-ui, sans-serif;
+  --shadow: 0 2px 0 rgba(255, 121, 176, 0.12), 0 12px 28px rgba(255, 121, 176, 0.18);
 }
 
 * {
@@ -21,6 +59,190 @@ body,
 
 body {
   background: var(--bg);
-  color: var(--fg);
+  background-image: var(--bg-grad);
+  background-attachment: fixed;
+  color: var(--text);
+  font-family: var(--font);
   -webkit-font-smoothing: antialiased;
+}
+
+/* terminal CRT scanline flavor */
+[data-theme="terminal"] body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(70, 217, 112, 0.03) 0px,
+    rgba(70, 217, 112, 0.03) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  z-index: 50;
+  opacity: 0.5;
+}
+
+a {
+  color: var(--primary);
+  text-decoration: none;
+}
+
+/* ---- reusable components ---- */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.05s ease, filter 0.15s ease, background 0.15s ease;
+}
+.btn:hover {
+  filter: brightness(1.08);
+}
+.btn:active {
+  transform: translateY(1px);
+}
+.btn-primary {
+  background: var(--primary);
+  color: var(--on-primary);
+  border-color: transparent;
+}
+.btn-ghost {
+  background: transparent;
+}
+
+.input {
+  width: 100%;
+  padding: 0.65rem 0.8rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  outline: none;
+}
+.input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-soft);
+}
+
+.label {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  margin-bottom: 0.3rem;
+  letter-spacing: 0.02em;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-size: 0.78rem;
+}
+
+.muted {
+  color: var(--text-dim);
+}
+
+/* ---- navigation ---- */
+.pb-sidebar {
+  display: none;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 10px;
+  width: 210px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+}
+.pb-navlink {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--radius);
+  color: var(--text);
+  font-weight: 600;
+  font-size: 0.92rem;
+}
+.pb-navlink:hover {
+  background: var(--surface-2);
+}
+.pb-navlink.active {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.pb-tabbar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 30;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  backdrop-filter: blur(8px);
+  border-top: 1px solid var(--border);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.pb-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 2px;
+  color: var(--text-dim);
+}
+.pb-tab.active {
+  color: var(--primary);
+}
+
+@media (min-width: 820px) {
+  .pb-sidebar {
+    display: flex;
+  }
+  .pb-tabbar {
+    display: none;
+  }
+}
+
+/* ---- layout helpers ---- */
+.grid-cards {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+.stat {
+  padding: 16px;
+}
+.stat .v {
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.stat .k {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }

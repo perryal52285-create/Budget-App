@@ -121,6 +121,45 @@ CREATE TABLE IF NOT EXISTS transactions (
     amount_cents INTEGER NOT NULL DEFAULT 0,
     txn_date TEXT DEFAULT ''
 );
+
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE NOT NULL,
+    display_name TEXT DEFAULT '',
+    password_salt TEXT NOT NULL,
+    password_hash TEXT NOT NULL,
+    must_change_password INTEGER NOT NULL DEFAULT 0,
+    earner_id INTEGER DEFAULT NULL,        -- links a login to an earner profile
+    theme TEXT DEFAULT '',                  -- per-user default theme override
+    created_at INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+    token TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL
+);
+
+-- Net-worth tracking: accounts + dated balance snapshots.
+CREATE TABLE IF NOT EXISTS accounts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    kind TEXT NOT NULL DEFAULT 'checking',  -- checking|savings|investment|cash|property|loan|credit|other
+    is_liability INTEGER NOT NULL DEFAULT 0,
+    institution TEXT DEFAULT '',
+    owner_earner_id INTEGER DEFAULT NULL,
+    active INTEGER NOT NULL DEFAULT 1,
+    sort_order INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS account_balances (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id INTEGER NOT NULL,
+    as_of TEXT NOT NULL,                     -- ISO date
+    balance_cents INTEGER NOT NULL DEFAULT 0,
+    UNIQUE(account_id, as_of)
+);
 """
 
 
@@ -130,6 +169,7 @@ def init_db():
         con.executescript(SCHEMA)
     _migrate()
     _seed()
+    _seed_users()
 
 
 # Additive schema migrations: (table, column, column-def). CREATE TABLE IF NOT
@@ -176,6 +216,25 @@ def _seed():
         "INSERT INTO income_sources (earner_id, name, kind, amount_cents, frequency, month, day1)"
         " VALUES (?,?,?,?,?,?,?)",
         (alex, "January Bonus", "bonus_annual", 0, "annual", 1, 15))
+
+
+def _seed_users():
+    """Create the two logins (Alex, Rae) on first run, linked to their earner
+    profiles by name. Runs independently of _seed so it also bootstraps existing
+    databases that predate auth. Default password is a throwaway that must be
+    changed on first login."""
+    if query("SELECT 1 FROM users LIMIT 1"):
+        return
+    # Imported lazily to avoid a circular import at module load.
+    from . import auth
+    import time
+    earners = {e["name"].lower(): e["id"] for e in query("SELECT id, name FROM earners")}
+    for username, display in (("alex", "Alex"), ("rae", "Rae")):
+        salt, h = auth.hash_password(auth.DEFAULT_PASSWORD)
+        execute(
+            "INSERT INTO users (username, display_name, password_salt, password_hash,"
+            " must_change_password, earner_id, created_at) VALUES (?,?,?,?,?,?,?)",
+            (username, display, salt, h, 1, earners.get(username), int(time.time())))
 
 
 @contextmanager

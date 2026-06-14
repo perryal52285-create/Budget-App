@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.5.0
+- **React rebuild — Phase 1 (auth + app shell).** The new `/ui` becomes a real,
+  password-protected app.
+  - **Two-user login** (Alex + Rae) — stdlib PBKDF2 password hashing and
+    DB-backed sessions (httpOnly cookie), with login rate-limiting. No new
+    dependencies, so the Alpine build stays reliable. First login forces a
+    password change off the seeded `Test#1`.
+  - API: `/api/login`, `/api/logout`, `/api/me`, `/api/change-password`, plus a
+    `require_user` dependency for protecting data endpoints.
+  - **Dual-theme design system** rebuilt — terminal (dark/phosphor/mono) and
+    bubbly (pastel/rounded), swapped by a single `data-theme` attribute, saved
+    per browser and applied before first paint.
+  - **Responsive shell** — sidebar on desktop, bottom tab bar on mobile; header
+    with theme toggle, user chip, and sign-out.
+  - New DB tables (additive, no data loss): `users`, `sessions`, `accounts`,
+    `account_balances` — groundwork for net-worth tracking. The dormant `goals`
+    table will power sinking funds.
+- Next: live dashboard data → net-worth accounts → budgets+goals → reports →
+  terminal + PWA → retire Jinja → Cloudflare tunnel.
+
 ## 0.4.0
 - **React rebuild — Phase 0 (scaffold).** Groundwork for the new password-protected,
   mobile-first React frontend. Nothing user-facing changes yet: the classic UI still

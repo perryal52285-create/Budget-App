@@ -1,5 +1,5 @@
 name: Perry Budget
-version: "0.4.0"
+version: "0.5.0"
 slug: perry_budget
 description: Biweekly pay-date engine, two earners, hybrid bill funding, debt snowball, monthly history, category budgets, HA alerts/sensors, and a command-driven web terminal. Terminal (dark) + bubbly (light) themes.
 url: https://github.com/perryal52285-create/Budget-App
