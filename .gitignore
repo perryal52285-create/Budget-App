@@ -5,3 +5,8 @@ venv/
 perry_budget/data/
 *.db
 .DS_Store
+
+# frontend
+perry_budget/frontend/node_modules/
+perry_budget/frontend/dist/
+perry_budget/app/frontend_dist/

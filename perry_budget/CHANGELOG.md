@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.4.0
+- **React rebuild — Phase 0 (scaffold).** Groundwork for the new password-protected,
+  mobile-first React frontend. Nothing user-facing changes yet: the classic UI still
+  serves at `/`.
+  - New **JSON API** (`/api`) exposing the budget engine — starting with `/api/health`.
+    Additive; the existing Jinja routes are untouched.
+  - New **React + Vite SPA** served at `/ui`, built in a **multi-stage Docker** image
+    (Node builds the bundle → copied into the Python runtime). Same push-to-update flow.
+  - **HA ingress base-path handling:** the server injects a runtime `<base href>` and
+    API/router base derived from `X-Ingress-Path`, so the SPA works behind ingress and
+    standalone on `:8099`.
+- Next phases: two-user auth (Alex/Rae) → React dashboard → manage/budgets/debts →
+  terminal + dual-theme polish + mobile/PWA → retire Jinja → Cloudflare tunnel.
+
 ## 0.3.3
 - **Fix:** the allocation donut rendered huge and showed both the 🐱 and the income
   number at once. Cause was the browser serving a stale cached `theme.css` from before

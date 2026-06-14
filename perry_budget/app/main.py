@@ -2,36 +2,63 @@
 import os
 
 from fastapi import FastAPI, Request, Form
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from . import db, budget, ha, tui
+from . import db, budget, ha, tui, api as api_routes
+from .meta import VERSION
 
 BASE = os.path.dirname(__file__)
+FRONTEND_DIST = os.path.join(BASE, "frontend_dist")
 app = FastAPI(title="Perry Budget")
 app.mount("/static", StaticFiles(directory=os.path.join(BASE, "static")), name="static")
 templates = Jinja2Templates(directory=os.path.join(BASE, "templates"))
 
+# JSON API for the React frontend (additive — the Jinja routes below stay live).
+app.include_router(api_routes.router)
 
-def _read_version() -> str:
-    """Read the add-on version from config.yaml (used to cache-bust static assets)."""
-    try:
-        with open(os.path.join(BASE, "..", "config.yaml"), encoding="utf-8") as f:
-            for line in f:
-                if line.strip().startswith("version:"):
-                    return line.split(":", 1)[1].strip().strip('"').strip("'")
-    except OSError:
-        pass
-    return "dev"
-
-
-VERSION = _read_version()
+# Serve the built React SPA (if present) at /ui. Assets are mounted before the
+# catch-all route so they win the match.
+if os.path.isdir(os.path.join(FRONTEND_DIST, "assets")):
+    app.mount("/ui/assets", StaticFiles(directory=os.path.join(FRONTEND_DIST, "assets")),
+              name="ui-assets")
 
 
 @app.on_event("startup")
 def _startup():
     db.init_db()
+
+
+def _spa_index(request: Request) -> HTMLResponse:
+    """Return the SPA shell with ingress-aware runtime config injected.
+
+    HA ingress serves the add-on under a per-session prefix (X-Ingress-Path).
+    The SPA needs that at runtime, so we inject a <base href> (for relative
+    asset URLs) and replace the window.* markers (for the API base + router
+    basename). Standalone on :8099 the header is empty and everything resolves
+    from root.
+    """
+    ingress = request.headers.get("X-Ingress-Path", "")
+    index_path = os.path.join(FRONTEND_DIST, "index.html")
+    try:
+        with open(index_path, encoding="utf-8") as f:
+            html = f.read()
+    except OSError:
+        return HTMLResponse(
+            "<h1>Perry Budget</h1><p>React UI not built yet. The classic UI is at "
+            f"<a href='{ingress}/'>/</a>.</p>", status_code=503)
+    base_href = f"{ingress}/ui/"
+    html = html.replace("<head>", f"<head>\n    <base href=\"{base_href}\" />", 1)
+    html = html.replace("__INGRESS_PATH__", ingress)
+    html = html.replace("__ROUTER_BASE_PATH__", f"{ingress}/ui")
+    return HTMLResponse(html)
+
+
+@app.get("/ui")
+@app.get("/ui/{path:path}")
+def spa(request: Request, path: str = ""):
+    return _spa_index(request)
 
 
 def ctx(request: Request, **extra):
