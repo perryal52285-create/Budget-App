@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.7.0
+- **Terminal** (new React page) — the command-driven TUI, in-app, with command
+  history (↑/↓) and the `perry//budget $` prompt, talking to `/api/term/exec`.
+- **PWA** — installable to a phone home screen. Web manifest, themed icons
+  (192/512/maskable + SVG), and an offline service worker that caches the app
+  shell (never the API).
+- **Legacy Jinja UI retired.** `main.py` now serves only the SPA + API; `/`
+  (and old `/budgets`, `/manage`, `/term`) redirect into `/ui`. This removes the
+  last ungated pages — important before exposing the app publicly.
+- **Remote access ready (Cloudflare Tunnel).** `run.sh` runs uvicorn with
+  `--proxy-headers`, so behind a tunnel the app sees HTTPS and marks session
+  cookies `Secure`. Setup guide added to the README (incl. a Cloudflare Access
+  recommendation).
+
 ## 0.6.0
 - **React rebuild — Phase 2+ (the full app).** `/ui` is now a complete,
   better-than-the-spreadsheet budgeting app, theme-locked per user

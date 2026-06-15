@@ -11,6 +11,7 @@ import Budgets from "./pages/Budgets";
 import Goals from "./pages/Goals";
 import Manage from "./pages/Manage";
 import Reports from "./pages/Reports";
+import Terminal from "./pages/Terminal";
 
 export default function App() {
   const { user, loading } = useAuth();
@@ -40,6 +41,7 @@ export default function App() {
         <Route path="/goals" element={<Goals />} />
         <Route path="/manage" element={<Manage />} />
         <Route path="/reports" element={<Reports />} />
+        <Route path="/terminal" element={<Terminal />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Shell>

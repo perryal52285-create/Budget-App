@@ -72,14 +72,47 @@ the header clock. Change it on **Manage → Settings**.
 
 Preference is saved per browser and applied before paint (no flash).
 
+## Status
+
+Rebuilt as a **React SPA** (`/ui`) on the same FastAPI/SQLite engine:
+two-user auth, per-user theme lock (Alex=terminal, Rae=bubbly), Dashboard,
+**Net Worth** (accounts + balance history), **Goals/sinking funds**, Budgets,
+Manage (full CRUD), **Reports** (cash flow / category / net-worth trends), the
+command **Terminal**, HA sensors + alerts, and an installable **PWA**.
+
 ## Roadmap
 
-- **Phase 3** — budgets + HA notification alerts + HA sensor export
-- **Phase 4** — forecasting / savings goals (incl. the bonus & 3-check surplus)
-- **Phase 5** — paystub PDF upload + parse (portal only), CSV import
+- Envelope **rollover / month-end true-up** for category budgets
+- **Scheduled transactions + rules** (auto-categorize) and **split transactions**
+- Paystub PDF upload + parse (portal only), **CSV import**
 
 > Security: this tool only needs transaction/payment data — **never** store bank/portal login
 > passwords or API tokens in source. Any future tokens go in the add-on's options store.
+
+## Remote access (Cloudflare Tunnel)
+
+The app is a React SPA at **`/ui`** with a password-protected JSON API at `/api`
+(two users: `alex`, `rae`). Inside Home Assistant it's reached via ingress. To
+reach it **from anywhere**, expose the add-on's standalone port (`8099`) through a
+Cloudflare Tunnel — no port-forwarding, free, and HTTPS end to end.
+
+1. **Install the Cloudflared add-on** (HA community add-on store) **or** run
+   `cloudflared` anywhere on the LAN.
+2. In **Cloudflare Zero Trust → Networks → Tunnels**, create a tunnel and add a
+   **public hostname** (e.g. `budget.yourdomain.com`).
+3. Point that hostname at the service:
+   `http://<home-assistant-ip>:8099` (the Perry Budget add-on port).
+4. Open `https://budget.yourdomain.com` → you'll land on the login screen.
+
+**Security model when tunneled:** the app's own login is the only wall, so:
+- Session cookies are automatically marked **`Secure`** behind the tunnel
+  (the app honors `X-Forwarded-Proto`; `run.sh` starts uvicorn with
+  `--proxy-headers`).
+- Change both users off the seeded `Test#1` on first login.
+- The legacy ungated Jinja pages have been **removed** — every route is either
+  the static SPA shell or an auth-gated API call.
+- **Recommended hardening:** put **Cloudflare Access** in front of the hostname
+  (email OTP / Google login) for a second factor before the app's own login.
 
 ## Local development
 

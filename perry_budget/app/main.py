@@ -1,25 +1,24 @@
-"""Perry Budget — FastAPI app served via Home Assistant ingress."""
+"""Perry Budget — FastAPI app.
+
+Serves the React SPA (/ui) and the JSON API (/api). The legacy Jinja UI has
+been retired: the React app is the only frontend, and "/" redirects to it. This
+also matters for security — every data path now sits behind the API's auth, so
+exposing the add-on via a Cloudflare tunnel doesn't leak an ungated page.
+"""
 import os
 
-from fastapi import FastAPI, Request, Form
-from fastapi.responses import RedirectResponse, HTMLResponse
+from fastapi import FastAPI, Request
+from fastapi.responses import RedirectResponse, HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 
-from . import db, budget, ha, tui, api as api_routes
-from .meta import VERSION
+from . import db, api as api_routes
 
 BASE = os.path.dirname(__file__)
 FRONTEND_DIST = os.path.join(BASE, "frontend_dist")
 app = FastAPI(title="Perry Budget")
-app.mount("/static", StaticFiles(directory=os.path.join(BASE, "static")), name="static")
-templates = Jinja2Templates(directory=os.path.join(BASE, "templates"))
 
-# JSON API for the React frontend (additive — the Jinja routes below stay live).
 app.include_router(api_routes.router)
 
-# Serve the built React SPA (if present) at /ui. Assets are mounted before the
-# catch-all route so they win the match.
 if os.path.isdir(os.path.join(FRONTEND_DIST, "assets")):
     app.mount("/ui/assets", StaticFiles(directory=os.path.join(FRONTEND_DIST, "assets")),
               name="ui-assets")
@@ -31,385 +30,51 @@ def _startup():
 
 
 def _spa_index(request: Request) -> HTMLResponse:
-    """Return the SPA shell with ingress-aware runtime config injected.
-
-    HA ingress serves the add-on under a per-session prefix (X-Ingress-Path).
-    The SPA needs that at runtime, so we inject a <base href> (for relative
-    asset URLs) and replace the window.* markers (for the API base + router
-    basename). Standalone on :8099 the header is empty and everything resolves
-    from root.
-    """
+    """SPA shell with ingress-aware runtime config injected (see frontend/api.ts)."""
     ingress = request.headers.get("X-Ingress-Path", "")
-    index_path = os.path.join(FRONTEND_DIST, "index.html")
     try:
-        with open(index_path, encoding="utf-8") as f:
+        with open(os.path.join(FRONTEND_DIST, "index.html"), encoding="utf-8") as f:
             html = f.read()
     except OSError:
-        return HTMLResponse(
-            "<h1>Perry Budget</h1><p>React UI not built yet. The classic UI is at "
-            f"<a href='{ingress}/'>/</a>.</p>", status_code=503)
-    base_href = f"{ingress}/ui/"
-    html = html.replace("<head>", f"<head>\n    <base href=\"{base_href}\" />", 1)
+        return HTMLResponse("<h1>Perry Budget</h1><p>UI not built.</p>", status_code=503)
+    html = html.replace("<head>", f"<head>\n    <base href=\"{ingress}/ui/\" />", 1)
     html = html.replace("__INGRESS_PATH__", ingress)
     html = html.replace("__ROUTER_BASE_PATH__", f"{ingress}/ui")
     return HTMLResponse(html)
 
 
+_MEDIA = {".webmanifest": "application/manifest+json"}
+
+
+@app.get("/")
+def root(request: Request):
+    return RedirectResponse(url=f"{request.headers.get('X-Ingress-Path', '')}/ui/")
+
+
+# Friendly redirects for the retired Jinja paths.
+@app.get("/budgets")
+def _r_budgets(request: Request):
+    return RedirectResponse(url=f"{request.headers.get('X-Ingress-Path', '')}/ui/budgets")
+
+
+@app.get("/manage")
+def _r_manage(request: Request):
+    return RedirectResponse(url=f"{request.headers.get('X-Ingress-Path', '')}/ui/manage")
+
+
+@app.get("/term")
+def _r_term(request: Request):
+    return RedirectResponse(url=f"{request.headers.get('X-Ingress-Path', '')}/ui/terminal")
+
+
 @app.get("/ui")
 @app.get("/ui/{path:path}")
 def spa(request: Request, path: str = ""):
+    # Serve real files that live in the dist root (manifest, sw.js, icons);
+    # everything else is a client route -> return the SPA shell.
+    if path:
+        candidate = os.path.normpath(os.path.join(FRONTEND_DIST, path))
+        if candidate.startswith(FRONTEND_DIST) and os.path.isfile(candidate):
+            ext = os.path.splitext(candidate)[1]
+            return FileResponse(candidate, media_type=_MEDIA.get(ext))
     return _spa_index(request)
-
-
-def ctx(request: Request, **extra):
-    base = request.headers.get("X-Ingress-Path", "")
-    now = budget.now_ct()
-    data = {
-        "request": request, "base": base, "fmt": budget.fmt,
-        "now_str": now.strftime("%a %b %-d, %Y · %-I:%M %p"),
-        "tz_name": db.get_setting("timezone", "America/Chicago"),
-        "month_names": budget.MONTH_NAMES,
-        "version": VERSION,
-    }
-    data.update(extra)
-    return data
-
-
-def _cents(value) -> int:
-    try:
-        return round(float(str(value).replace(",", "").replace("$", "").strip()) * 100)
-    except (ValueError, AttributeError):
-        return 0
-
-
-def _int(value, default=0) -> int:
-    try:
-        return int(str(value).strip())
-    except (ValueError, AttributeError):
-        return default
-
-
-def _float(value, default=0.0) -> float:
-    try:
-        return float(str(value).strip())
-    except (ValueError, AttributeError):
-        return default
-
-
-def back(request: Request, anchor: str = "") -> RedirectResponse:
-    base = request.headers.get("X-Ingress-Path", "")
-    return RedirectResponse(url=f"{base}/manage{anchor}", status_code=303)
-
-
-def back_dash(request: Request, year: int, month: int) -> RedirectResponse:
-    base = request.headers.get("X-Ingress-Path", "")
-    return RedirectResponse(url=f"{base}/?year={year}&month={month}", status_code=303)
-
-
-# ---- dashboard -----------------------------------------------------------
-
-@app.get("/")
-def dashboard(request: Request, year: int = None, month: int = None):
-    cy, cm = budget.current_period()
-    year = year or cy
-    month = month or cm
-    if month < 1 or month > 12:
-        year, month = cy, cm
-
-    if (year, month) == (cy, cm):
-        budget.snapshot_debts(year, month)  # keep current-month debt history fresh
-        # best-effort: keep HA sensors in sync whenever the current month is viewed
-        if db.get_setting("sensors_enabled", "1") == "1":
-            ha.push_sensors(budget.sensor_payload(year, month))
-
-    view = budget.month_view(year, month)
-    py, pm = budget.shift_month(year, month, -1)
-    ny, nm = budget.shift_month(year, month, 1)
-    months_, points = budget.snowball_projection()
-    chart = budget.svg_area_chart(points)
-    donut = budget.donut_chart(budget.month_allocation(view), size=300, thickness=36)
-
-    # flatten all assigned + unassigned bills for the upcoming panel, sorted by due_dom
-    _seen: set = set()
-    upcoming = []
-    for p in view["paychecks"]:
-        for b in p["bills"]:
-            if b["id"] not in _seen:
-                _seen.add(b["id"])
-                upcoming.append({**b, "earner_color": p["color"], "earner_name": p["earner_name"]})
-    for b in view["unassigned"]:
-        if b["id"] not in _seen:
-            _seen.add(b["id"])
-            upcoming.append({**b, "earner_color": "#888", "earner_name": "unassigned"})
-    upcoming.sort(key=lambda b: b.get("due_dom") or 99)
-
-    return templates.TemplateResponse("dashboard.html", ctx(
-        request,
-        view=view,
-        donut=donut,
-        upcoming=upcoming,
-        prev={"year": py, "month": pm},
-        next={"year": ny, "month": nm},
-        is_current=(year, month) == (cy, cm),
-        three_check=budget.three_check_months(year),
-        total_debt=budget.total_debt(),
-        next_target=budget.next_target(),
-        payoff_months=months_,
-        chart=chart,
-        alerts=budget.detect_alerts(year, month),
-    ))
-
-
-# ---- budgets -------------------------------------------------------------
-
-@app.get("/budgets")
-def budgets_page(request: Request, year: int = None, month: int = None):
-    cy, cm = budget.current_period()
-    year = year or cy
-    month = month or cm
-    if month < 1 or month > 12:
-        year, month = cy, cm
-    rows, untracked = budget.budget_status(year, month)
-    txns = db.query(
-        "SELECT * FROM transactions WHERE year=? AND month=? ORDER BY id DESC", (year, month))
-    py, pm = budget.shift_month(year, month, -1)
-    ny, nm = budget.shift_month(year, month, 1)
-    return templates.TemplateResponse("budgets.html", ctx(
-        request,
-        year=year, month=month, label=budget.month_label(year, month),
-        rows=rows, untracked=untracked, transactions=txns,
-        prev={"year": py, "month": pm}, next={"year": ny, "month": nm},
-        categories=db.query("SELECT DISTINCT category FROM bills WHERE category != '' ORDER BY category"),
-    ))
-
-
-@app.post("/manage/budgets/save")
-def save_budget(request: Request, category: str = Form(...), amount: str = Form("0")):
-    cat = category.strip()
-    if cat:
-        db.execute(
-            "INSERT INTO budgets (category, monthly_limit_cents) VALUES (?,?) "
-            "ON CONFLICT(category) DO UPDATE SET monthly_limit_cents=excluded.monthly_limit_cents",
-            (cat, _cents(amount)))
-    return RedirectResponse(url=f"{request.headers.get('X-Ingress-Path', '')}/budgets", status_code=303)
-
-
-@app.post("/manage/budgets/{budget_id}/delete")
-def delete_budget(request: Request, budget_id: int):
-    db.execute("DELETE FROM budgets WHERE id=?", (budget_id,))
-    return RedirectResponse(url=f"{request.headers.get('X-Ingress-Path', '')}/budgets", status_code=303)
-
-
-@app.post("/budgets/spend")
-async def add_spend(request: Request):
-    f = await request.form()
-    y, m = _int(f.get("year")) or None, _int(f.get("month")) or None
-    cy, cm = budget.current_period()
-    y, m = y or cy, m or cm
-    db.execute(
-        "INSERT INTO transactions (year, month, category, description, amount_cents, txn_date) "
-        "VALUES (?,?,?,?,?,?)",
-        (y, m, f.get("category", "").strip(), f.get("description", "").strip(),
-         _cents(f.get("amount", 0)), f.get("txn_date", "") or budget.now_ct().date().isoformat()))
-    base = request.headers.get("X-Ingress-Path", "")
-    return RedirectResponse(url=f"{base}/budgets?year={y}&month={m}", status_code=303)
-
-
-@app.post("/budgets/spend/{txn_id}/delete")
-async def delete_spend(request: Request, txn_id: int):
-    db.execute("DELETE FROM transactions WHERE id=?", (txn_id,))
-    return RedirectResponse(url=f"{request.headers.get('X-Ingress-Path', '')}/budgets", status_code=303)
-
-
-# ---- web terminal (TUI) --------------------------------------------------
-
-@app.get("/term")
-def term_page(request: Request):
-    return templates.TemplateResponse("term.html", ctx(request, prompt=tui.PROMPT))
-
-
-@app.post("/term/exec")
-async def term_exec(request: Request):
-    f = await request.form()
-    return {"output": tui.run(f.get("line", ""))}
-
-
-# ---- alerts / sensors test ----------------------------------------------
-
-@app.post("/alerts/test")
-def alerts_test(request: Request):
-    cy, cm = budget.current_period()
-    if db.get_setting("sensors_enabled", "1") == "1":
-        ha.push_sensors(budget.sensor_payload(cy, cm))
-    msg = "Perry Budget test: HA link is working. ✓"
-    al = budget.detect_alerts(cy, cm)
-    if al:
-        msg = "Perry Budget — " + "; ".join(a["text"] for a in al[:3])
-    service = db.get_setting("notify_service", "notify") or "notify"
-    ha.notify(msg, service=service)
-    return back(request, "#settings")
-
-
-# ---- manage --------------------------------------------------------------
-
-@app.get("/manage")
-def manage(request: Request):
-    sources = db.query("SELECT * FROM income_sources ORDER BY earner_id, name")
-    for s in sources:
-        s["preview"] = budget.source_preview(s)
-    return templates.TemplateResponse("manage.html", ctx(
-        request,
-        earners=db.query("SELECT * FROM earners ORDER BY is_primary DESC, name"),
-        sources=sources,
-        bills=db.query("SELECT * FROM bills ORDER BY name"),
-        debts=db.query("SELECT * FROM debts ORDER BY roll_order, balance_cents"),
-        frequencies=["weekly", "biweekly", "semimonthly", "monthly", "annual", "one_time"],
-        kinds=["payroll", "reimbursement", "bonus_annual", "one_time", "other"],
-        sensors_enabled=db.get_setting("sensors_enabled", "1") == "1",
-        notify_service=db.get_setting("notify_service", "notify"),
-        alert_days_ahead=db.get_setting("alert_days_ahead", "3"),
-        ha_available=ha.available(),
-    ))
-
-
-# ---- earners -------------------------------------------------------------
-
-@app.post("/manage/earners/add")
-def add_earner(request: Request, name: str = Form(...), color: str = Form("#46d970")):
-    db.execute("INSERT INTO earners (name, color, is_primary) VALUES (?,?,0)", (name, color))
-    return back(request, "#earners")
-
-
-@app.post("/manage/earners/{earner_id}/update")
-def update_earner(request: Request, earner_id: int, name: str = Form(...), color: str = Form("#46d970")):
-    db.execute("UPDATE earners SET name=?, color=? WHERE id=?", (name, color, earner_id))
-    return back(request, "#earners")
-
-
-@app.post("/manage/earners/{earner_id}/delete")
-def delete_earner(request: Request, earner_id: int):
-    db.execute("DELETE FROM earners WHERE id=?", (earner_id,))
-    return back(request, "#earners")
-
-
-# ---- income sources ------------------------------------------------------
-
-def _income_fields(form):
-    return (
-        _int(form.get("earner_id")), form.get("name", ""), form.get("employer", ""),
-        form.get("kind", "payroll"), _cents(form.get("amount", 0)),
-        form.get("frequency", "biweekly"), form.get("anchor_date", ""),
-        _int(form.get("day1"), 1), _int(form.get("day2"), 0), _int(form.get("month"), 1),
-        1 if form.get("active", "1") else 0, form.get("notes", ""),
-    )
-
-
-@app.post("/manage/income/add")
-async def add_income(request: Request):
-    f = await request.form()
-    db.execute(
-        "INSERT INTO income_sources (earner_id, name, employer, kind, amount_cents, frequency,"
-        " anchor_date, day1, day2, month, active, notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-        _income_fields(f))
-    return back(request, "#earners")
-
-
-@app.post("/manage/income/{source_id}/update")
-async def update_income(request: Request, source_id: int):
-    f = await request.form()
-    vals = _income_fields(f) + (source_id,)
-    db.execute(
-        "UPDATE income_sources SET earner_id=?, name=?, employer=?, kind=?, amount_cents=?,"
-        " frequency=?, anchor_date=?, day1=?, day2=?, month=?, active=?, notes=? WHERE id=?", vals)
-    return back(request, "#earners")
-
-
-@app.post("/manage/income/{source_id}/delete")
-def delete_income(request: Request, source_id: int):
-    db.execute("DELETE FROM income_sources WHERE id=?", (source_id,))
-    return back(request, "#earners")
-
-
-# ---- bills ---------------------------------------------------------------
-
-@app.post("/manage/bills/add")
-async def add_bill(request: Request):
-    f = await request.form()
-    resp = _int(f.get("responsible_earner_id")) or None
-    fsrc = _int(f.get("funding_source_id")) or None
-    focc = _int(f.get("funding_occurrence")) or None
-    db.execute(
-        "INSERT INTO bills (name, amount_cents, due_dom, category, autopay, where_to_pay,"
-        " responsible_earner_id, funding_mode, funding_source_id, funding_occurrence)"
-        " VALUES (?,?,?,?,?,?,?,?,?,?)",
-        (f.get("name", ""), _cents(f.get("amount", 0)), _int(f.get("due_dom"), 1),
-         f.get("category", ""), 1 if f.get("autopay") else 0, f.get("where_to_pay", ""),
-         resp, f.get("funding_mode", "auto"), fsrc, focc))
-    return back(request, "#bills")
-
-
-@app.post("/manage/bills/{bill_id}/delete")
-def delete_bill(request: Request, bill_id: int):
-    db.execute("DELETE FROM bills WHERE id=?", (bill_id,))
-    return back(request, "#bills")
-
-
-# ---- debts ---------------------------------------------------------------
-
-@app.post("/manage/debts/add")
-def add_debt(request: Request, name: str = Form(...), balance: str = Form("0"),
-             min_payment: str = Form("0"), apr: str = Form("0"), roll_order: str = Form("0")):
-    db.execute(
-        "INSERT INTO debts (name, balance_cents, min_payment_cents, apr, roll_order) VALUES (?,?,?,?,?)",
-        (name, _cents(balance), _cents(min_payment), _float(apr), _int(roll_order)))
-    return back(request, "#debts")
-
-
-@app.post("/manage/debts/{debt_id}/delete")
-def delete_debt(request: Request, debt_id: int):
-    db.execute("DELETE FROM debts WHERE id=?", (debt_id,))
-    return back(request, "#debts")
-
-
-# ---- settings ------------------------------------------------------------
-
-@app.post("/manage/settings/save")
-async def save_settings(request: Request):
-    f = await request.form()
-    db.set_setting("timezone", (f.get("timezone", "") or "America/Chicago").strip() or "America/Chicago")
-    db.set_setting("sensors_enabled", "1" if f.get("sensors_enabled") else "0")
-    db.set_setting("notify_service", (f.get("notify_service", "") or "notify").strip() or "notify")
-    db.set_setting("alert_days_ahead", str(_int(f.get("alert_days_ahead"), 3)))
-    return back(request, "#settings")
-
-
-# ---- per-month actuals (history) -----------------------------------------
-
-@app.post("/period/paycheck/save")
-def save_paycheck_actual(request: Request, year: int = Form(...), month: int = Form(...),
-                         source_id: int = Form(...), occurrence: int = Form(...),
-                         pay_date: str = Form(""), amount: str = Form("0"), motus: str = Form("0")):
-    db.execute(
-        "INSERT INTO paycheck_actuals (year, month, source_id, occurrence, pay_date, amount_cents,"
-        " motus_cents) VALUES (?,?,?,?,?,?,?) "
-        "ON CONFLICT(year, month, source_id, occurrence) DO UPDATE SET "
-        "pay_date=excluded.pay_date, amount_cents=excluded.amount_cents, motus_cents=excluded.motus_cents",
-        (year, month, source_id, occurrence, pay_date, _cents(amount), _cents(motus)))
-    return back_dash(request, year, month)
-
-
-@app.post("/period/bill/save")
-async def save_bill_payment(request: Request):
-    f = await request.form()
-    year, month = _int(f.get("year")), _int(f.get("month"))
-    fsrc = _int(f.get("funding_source_id")) or None
-    focc = _int(f.get("funding_occurrence")) or None
-    db.execute(
-        "INSERT INTO bill_payments (year, month, bill_id, paid_cents, paid, funding_source_id,"
-        " funding_occurrence) VALUES (?,?,?,?,?,?,?) "
-        "ON CONFLICT(year, month, bill_id) DO UPDATE SET "
-        "paid_cents=excluded.paid_cents, paid=excluded.paid, "
-        "funding_source_id=excluded.funding_source_id, funding_occurrence=excluded.funding_occurrence",
-        (year, month, _int(f.get("bill_id")), _cents(f.get("paid_cents", 0)),
-         1 if f.get("paid") else 0, fsrc, focc))
-    return back_dash(request, year, month)

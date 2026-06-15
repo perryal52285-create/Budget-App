@@ -11,6 +11,7 @@ const NAV = [
   { to: "/goals", label: "Goals", icon: "🎯" },
   { to: "/manage", label: "Manage", icon: "⚙️" },
   { to: "/reports", label: "Reports", icon: "📈" },
+  { to: "/terminal", label: "Terminal", icon: "›_" },
 ];
 
 export default function Shell({ children }: { children: ReactNode }) {

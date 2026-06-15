@@ -8,6 +8,13 @@ import { ThemeProvider } from "./theme";
 import { AuthProvider } from "./auth";
 import "./index.css";
 
+// Register the PWA service worker (scope = the app's /ui/ path).
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register(`${routerBase || "/ui"}/sw.js`).catch(() => { /* non-fatal */ });
+  });
+}
+
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
 });
