@@ -2,6 +2,7 @@ import { NavLink, useLocation } from "react-router-dom";
 import type { ReactNode } from "react";
 import { useAuth } from "../auth";
 import { useTheme } from "../theme";
+import { apiPost } from "../api";
 
 const NAV = [
   { to: "/", label: "Dashboard", icon: "📊", end: true },
@@ -14,8 +15,15 @@ const NAV = [
 
 export default function Shell({ children }: { children: ReactNode }) {
   const { user, logout } = useAuth();
-  const { theme, toggle } = useTheme();
+  const { theme, setTheme } = useTheme();
   const loc = useLocation();
+
+  // Switch theme and remember it for this login (persists their per-user lock).
+  const switchTheme = () => {
+    const next = theme === "terminal" ? "bubbly" : "terminal";
+    setTheme(next);
+    apiPost("/theme", { theme: next }).catch(() => { /* non-fatal */ });
+  };
   const title = NAV.find((n) => (n.end ? loc.pathname === n.to : loc.pathname.startsWith(n.to)))?.label
     ?? "Perry Budget";
 
@@ -31,7 +39,7 @@ export default function Shell({ children }: { children: ReactNode }) {
         <strong style={{ fontSize: 16 }}>Perry Budget</strong>
         <span className="muted" style={{ fontSize: 13 }}>· {title}</span>
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
-          <button className="btn btn-ghost" onClick={toggle} title="Switch theme"
+          <button className="btn btn-ghost" onClick={switchTheme} title="Switch theme"
             style={{ padding: "0.35rem 0.6rem" }}>
             {theme === "terminal" ? "🖥️" : "🫧"}
           </button>

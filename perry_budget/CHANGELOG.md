@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.6.0
+- **React rebuild — Phase 2+ (the full app).** `/ui` is now a complete,
+  better-than-the-spreadsheet budgeting app, theme-locked per user
+  (Alex = terminal, Rae = bubbly; toggle still available and remembered).
+  - **Dashboard** — month nav, alerts, live stat cards (income, bills funded,
+    left to allocate, total debt, net worth, debt-free ETA), allocation donut,
+    debt-payoff projection, and per-paycheck funded-bill breakdown.
+  - **Net Worth** (new) — accounts + liabilities, dated balance history, and a
+    net-worth-over-time chart. Closes the biggest gap vs YNAB/Monarch/Actual.
+  - **Goals / sinking funds** (new) — for the January bonus, the 3rd-paycheck
+    surplus, and savings targets, with progress bars.
+  - **Budgets** — category limits with live spend, over-budget flags, untracked
+    spend, and a spending log.
+  - **Manage** — full CRUD for earners, income sources (all frequencies), bills
+    (hybrid funding), debts (snowball order), plus settings + HA alert test.
+  - **Reports** (new) — 12-month cash flow, spending-by-category, net-worth trend.
+  - Full JSON API behind auth: dashboard, manage CRUD, budgets/transactions,
+    period actuals, accounts/balances, goals, reports, terminal, alerts.
+  - Charts via Recharts; both themes drive all chart colors via CSS variables.
+- **Fix:** `config.yaml` is now copied into the image, so `/api/health` and
+  asset cache-busting report the real version instead of `dev`.
+
 ## 0.5.0
 - **React rebuild — Phase 1 (auth + app shell).** The new `/ui` becomes a real,
   password-protected app.

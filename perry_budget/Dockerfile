@@ -22,6 +22,8 @@ COPY run.sh /run.sh
 RUN chmod a+x /run.sh
 
 COPY app ./app
+# config.yaml is read at runtime for the version string (cache-busting + /api/health)
+COPY config.yaml ./config.yaml
 # Built SPA from stage 1 -> served by FastAPI at /ui
 COPY --from=frontend /build/dist ./app/frontend_dist
 

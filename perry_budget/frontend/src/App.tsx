@@ -1,13 +1,25 @@
+import { useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "./auth";
+import { useTheme } from "./theme";
 import Shell from "./components/Shell";
 import Login from "./pages/Login";
 import ChangePassword from "./pages/ChangePassword";
 import Dashboard from "./pages/Dashboard";
-import Placeholder from "./pages/Placeholder";
+import Accounts from "./pages/Accounts";
+import Budgets from "./pages/Budgets";
+import Goals from "./pages/Goals";
+import Manage from "./pages/Manage";
+import Reports from "./pages/Reports";
 
 export default function App() {
   const { user, loading } = useAuth();
+  const { setTheme } = useTheme();
+
+  // Per-user theme lock: apply the signed-in user's saved theme on login.
+  useEffect(() => {
+    if (user?.theme === "terminal" || user?.theme === "bubbly") setTheme(user.theme);
+  }, [user?.id, user?.theme, setTheme]);
 
   if (loading) {
     return (
@@ -23,16 +35,11 @@ export default function App() {
     <Shell>
       <Routes>
         <Route path="/" element={<Dashboard />} />
-        <Route path="/accounts" element={<Placeholder title="Net Worth"
-          note="Accounts + balance history → net-worth-over-time. Coming in the accounts phase." />} />
-        <Route path="/budgets" element={<Placeholder title="Budgets"
-          note="Category budgets with month-end rollover and live spend tracking. Coming soon." />} />
-        <Route path="/goals" element={<Placeholder title="Goals"
-          note="Sinking funds for the January bonus, the 3-check surplus, and savings targets. Coming soon." />} />
-        <Route path="/manage" element={<Placeholder title="Manage"
-          note="Earners, income sources, bills, debts, and settings. Coming in the manage phase." />} />
-        <Route path="/reports" element={<Placeholder title="Reports"
-          note="Cash flow, spending-by-category trends, and net worth over time. Coming soon." />} />
+        <Route path="/accounts" element={<Accounts />} />
+        <Route path="/budgets" element={<Budgets />} />
+        <Route path="/goals" element={<Goals />} />
+        <Route path="/manage" element={<Manage />} />
+        <Route path="/reports" element={<Reports />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Shell>

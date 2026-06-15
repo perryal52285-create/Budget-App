@@ -449,6 +449,77 @@ def sensor_payload(year, month):
     }
 
 
+# ---- net worth / accounts -----------------------------------------------
+
+def accounts_with_balance():
+    """Active accounts, each with its most recent recorded balance."""
+    out = []
+    for a in db.query("SELECT * FROM accounts WHERE active=1 ORDER BY sort_order, name"):
+        a = dict(a)
+        bal = db.query(
+            "SELECT balance_cents, as_of FROM account_balances WHERE account_id=? "
+            "ORDER BY as_of DESC, id DESC LIMIT 1", (a["id"],))
+        a["balance_cents"] = bal[0]["balance_cents"] if bal else 0
+        a["as_of"] = bal[0]["as_of"] if bal else None
+        out.append(a)
+    return out
+
+
+def net_worth_summary():
+    accts = accounts_with_balance()
+    assets = sum(a["balance_cents"] for a in accts if not a["is_liability"])
+    liab = sum(a["balance_cents"] for a in accts if a["is_liability"])
+    return {"assets_cents": assets, "liabilities_cents": liab,
+            "net_cents": assets - liab, "accounts": accts}
+
+
+def net_worth_series():
+    """Net worth at each snapshot date = sum of the latest balance per account
+    on or before that date (liabilities subtracted)."""
+    dates = [r["as_of"] for r in
+             db.query("SELECT DISTINCT as_of FROM account_balances ORDER BY as_of")]
+    accts = db.query("SELECT id, is_liability FROM accounts")
+    out = []
+    for d in dates:
+        net = 0
+        for a in accts:
+            row = db.query(
+                "SELECT balance_cents FROM account_balances WHERE account_id=? AND as_of<=? "
+                "ORDER BY as_of DESC, id DESC LIMIT 1", (a["id"], d))
+            if row:
+                b = row[0]["balance_cents"]
+                net += -b if a["is_liability"] else b
+        out.append({"date": d, "net_cents": net})
+    return out
+
+
+# ---- reports -------------------------------------------------------------
+
+def cashflow_series(months=12):
+    """Projected income vs funded bills vs leftover for the last `months`."""
+    cy, cm = current_period()
+    y, m = shift_month(cy, cm, -(months - 1))
+    out = []
+    for _ in range(months):
+        v = month_view(y, m)
+        out.append({
+            "label": f"{MONTH_NAMES[m][:3]} '{str(y)[2:]}",
+            "year": y, "month": m,
+            "income_cents": v["total_in"],
+            "bills_cents": v["total_bills"],
+            "net_cents": v["remaining"],
+        })
+        y, m = shift_month(y, m, 1)
+    return out
+
+
+def category_breakdown(year, month):
+    """Spend per category this month, sorted desc (bills + ad-hoc transactions)."""
+    spend = category_spend(year, month)
+    return [{"category": c, "amount_cents": v}
+            for c, v in sorted(spend.items(), key=lambda kv: -kv[1])]
+
+
 DONUT_PALETTE = ["#5b9bff", "#ff5b5b", "#e3b341", "#b07cff", "#ff79b0",
                  "#28b487", "#ff944d", "#46d970"]
 

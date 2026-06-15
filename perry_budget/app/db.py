@@ -170,6 +170,15 @@ def init_db():
     _migrate()
     _seed()
     _seed_users()
+    _lock_user_themes()
+
+
+def _lock_user_themes():
+    """Idempotent: ensure Alex=terminal, Rae=bubbly even on installs that created
+    the users before the theme lock existed (only fills in a blank theme)."""
+    for username, theme in (("alex", "terminal"), ("rae", "bubbly")):
+        execute("UPDATE users SET theme=? WHERE username=? AND (theme='' OR theme IS NULL)",
+                (theme, username))
 
 
 # Additive schema migrations: (table, column, column-def). CREATE TABLE IF NOT
@@ -229,12 +238,13 @@ def _seed_users():
     from . import auth
     import time
     earners = {e["name"].lower(): e["id"] for e in query("SELECT id, name FROM earners")}
-    for username, display in (("alex", "Alex"), ("rae", "Rae")):
+    # Per-user theme lock: Alex = terminal, Rae = bubbly.
+    for username, display, theme in (("alex", "Alex", "terminal"), ("rae", "Rae", "bubbly")):
         salt, h = auth.hash_password(auth.DEFAULT_PASSWORD)
         execute(
             "INSERT INTO users (username, display_name, password_salt, password_hash,"
-            " must_change_password, earner_id, created_at) VALUES (?,?,?,?,?,?,?)",
-            (username, display, salt, h, 1, earners.get(username), int(time.time())))
+            " must_change_password, earner_id, theme, created_at) VALUES (?,?,?,?,?,?,?,?)",
+            (username, display, salt, h, 1, earners.get(username), theme, int(time.time())))
 
 
 @contextmanager
